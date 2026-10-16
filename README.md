@@ -60,13 +60,13 @@ All sound effects are synthesised in the browser (Web Audio, no files): timer be
 
 | Action | Team 1 | Team 2 |
 | --- | --- | --- |
-| Start / pause timer | `Q` | `P` |
+| Stop timer | `Q` | `P` |
 | Reset timer | `A` | `L` |
 | Points +1 (Shift = +5) | `W` | `O` |
 | Points −1 (Shift = −5) | `S` | `K` |
 
 - `→` / `←` — next / previous screen (Polygame → Phase Stats → Game Stats → Leaderboard)
-- `Space` — start / pause both timers (Polygame screen)
+- `Space` — start both timers at the same instant (a stopped one resumes); each team is stopped with its own key
 - `Shift+X` twice within 2 s — restart the open match
 - `Z` — back to the match list
 - `H` — show / hide the controls panel

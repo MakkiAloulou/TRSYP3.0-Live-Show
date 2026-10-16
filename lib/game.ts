@@ -108,7 +108,8 @@ export type Action =
   | { type: "editLabel"; team: TeamId; index: number; half: 0 | 1; key: string }
   | { type: "editStat"; team: TeamId; field: StatField; key: string }
   | { type: "toggleTimer"; team: TeamId; now: number }
-  | { type: "toggleBoth"; now: number }
+  | { type: "startBoth"; now: number }
+  | { type: "stopTimer"; team: TeamId; now: number }
   | { type: "resetTimer"; team: TeamId }
   | { type: "addPoints"; team: TeamId; delta: number }
   | { type: "rename"; team: TeamId; name: string }
@@ -438,16 +439,15 @@ function baseReducer(s: GameState, a: Action): GameState {
       });
     case "toggleTimer":
       return updateTeam(s, a.team, (t) => ({ ...t, timer: toggle(t.timer, a.now) }));
-    case "toggleBoth": {
-      // If either is running, pause both; otherwise start both.
-      const anyRunning = s.teams.some((t) => t.timer.running);
+    case "startBoth":
+      // One key starts both teams at the same instant (a stopped one resumes)
       return {
         ...s,
-        teams: s.teams.map((t) =>
-          t.timer.running === anyRunning ? { ...t, timer: toggle(t.timer, a.now) } : t,
-        ) as GameState["teams"],
+        teams: s.teams.map((t) => (t.timer.running ? t : { ...t, timer: toggle(t.timer, a.now) })) as GameState["teams"],
       };
-    }
+    case "stopTimer":
+      // Each team is stopped on its own key
+      return updateTeam(s, a.team, (t) => (t.timer.running ? { ...t, timer: toggle(t.timer, a.now) } : t));
     case "resetTimer":
       return updateTeam(s, a.team, (t) => ({ ...t, timer: freshTimer() }));
     case "addPoints":

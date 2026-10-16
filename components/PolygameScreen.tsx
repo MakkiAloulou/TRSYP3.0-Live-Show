@@ -20,11 +20,11 @@ const STORAGE_KEY = "trsyp3-polygame-v6"; // v6: games (page −1) + Garden
 /* Keyboard map by the letter printed on the key (works on AZERTY and QWERTY;
    caps lock / Shift don't matter). Shift + points key = ±5. */
 const KEYS = {
-  q: { type: "toggleTimer", team: 0 },
+  q: { type: "stopTimer", team: 0 },
   a: { type: "resetTimer", team: 0 },
   w: { type: "points", team: 0, delta: 1 },
   s: { type: "points", team: 0, delta: -1 },
-  p: { type: "toggleTimer", team: 1 },
+  p: { type: "stopTimer", team: 1 },
   l: { type: "resetTimer", team: 1 },
   o: { type: "points", team: 1, delta: 1 },
   k: { type: "points", team: 1, delta: -1 },
@@ -398,9 +398,8 @@ export default function PolygameScreen() {
         e.preventDefault();
         // Don't let Space also "click" a focused grid square / shape
         (document.activeElement as HTMLElement | null)?.blur();
-        if (stateRef.current.teams.some((t) => t.timer.running)) sfx.timerPause();
-        else sfx.timerStart();
-        dispatch({ type: "toggleBoth", now });
+        if (stateRef.current.teams.some((t) => !t.timer.running)) sfx.timerStart();
+        dispatch({ type: "startBoth", now });
         return;
       }
       const letter = e.key.toLowerCase();
@@ -444,10 +443,9 @@ export default function PolygameScreen() {
         if (k.delta > 0) sfx.pointUp();
         else sfx.pointDown();
         dispatch({ type: "addPoints", team: k.team, delta: k.delta * (e.shiftKey ? 5 : 1) });
-      } else if (k.type === "toggleTimer") {
+      } else if (k.type === "stopTimer") {
         if (stateRef.current.teams[k.team].timer.running) sfx.timerPause();
-        else sfx.timerStart();
-        dispatch({ type: "toggleTimer", team: k.team, now });
+        dispatch({ type: "stopTimer", team: k.team, now });
       } else {
         sfx.timerPause();
         dispatch({ type: "resetTimer", team: k.team });
@@ -604,7 +602,7 @@ export default function PolygameScreen() {
 
 function HelpOverlay({ onClose }: { onClose: () => void }) {
   const rows: [string, string, string][] = [
-    ["Start / pause timer", "Q", "P"],
+    ["Stop timer", "Q", "P"],
     ["Reset timer", "A", "L"],
     ["Points +1  (Shift = +5)", "W", "O"],
     ["Points −1  (Shift = −5)", "S", "K"],
@@ -633,7 +631,7 @@ function HelpOverlay({ onClose }: { onClose: () => void }) {
             </tbody>
           </table>
           <ul className="mt-6 space-y-1.5 text-base text-[var(--text-dim)]">
-            <li><Kbd>Space</Kbd> start / pause both timers</li>
+            <li><Kbd>Space</Kbd> start both timers together (a stopped one resumes)</li>
             <li>Garden: click the chances number (right click gives one back) or <Kbd>E</Kbd>/<Kbd>D</Kbd> team 1, <Kbd>I</Kbd>/<Kbd>J</Kbd> team 2 · <Kbd>Shift</Kbd>+<Kbd>1–9</Kbd> starting chances</li>
             <li>Matches screen: <Kbd>N</Kbd> new match (then 1–9 twice) · click a card to open · hover + <Kbd>Del</Kbd> twice to remove · <Kbd>Z</Kbd> back to the list from any screen</li>
             <li><Kbd>→</Kbd> next screen (Polygame → Phase Stats → Game Stats → Leaderboard) · <Kbd>←</Kbd> back</li>
