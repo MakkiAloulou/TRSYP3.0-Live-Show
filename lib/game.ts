@@ -45,6 +45,8 @@ export interface TeamState {
   stats: TeamStats;
   /** Garden: chances left */
   chances: number;
+  /** Polygame: robot marked as PINNED */
+  pinned?: boolean;
 }
 
 /** One of the 9 teams on the overall leaderboard */
@@ -120,6 +122,7 @@ export type Action =
   | { type: "openMatch"; id: string }
   | { type: "selectGame"; game: GameKind }
   | { type: "useChance"; team: TeamId; delta: number }
+  | { type: "togglePin"; team: TeamId }
   | { type: "setGardenChances"; n: number }
   | { type: "renameLeague"; id: string; name: string }
   | { type: "editLeaguePoints"; id: string; key: string }
@@ -520,6 +523,8 @@ function baseReducer(s: GameState, a: Action): GameState {
     case "selectGame":
       // leave any open match first, so nothing syncs into the wrong game
       return { ...s, game: a.game, current: null };
+    case "togglePin":
+      return updateTeam(s, a.team, (t) => ({ ...t, pinned: !t.pinned }));
     case "useChance":
       return updateTeam(s, a.team, (t) => ({ ...t, chances: Math.min(9, Math.max(0, t.chances + a.delta)) }));
     case "setGardenChances": {

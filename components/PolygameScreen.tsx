@@ -403,6 +403,15 @@ export default function PolygameScreen() {
         return;
       }
       const letter = e.key.toLowerCase();
+      // Polygame: R pins / unpins team 1, U team 2
+      if (stateRef.current.game === "polygame" && (letter === "r" || letter === "u")) {
+        e.preventDefault();
+        const team = letter === "r" ? 0 : 1;
+        if (stateRef.current.teams[team].pinned) sfx.unpin();
+        else sfx.pin();
+        dispatch({ type: "togglePin", team });
+        return;
+      }
       if (stateRef.current.game === "garden") {
         // Shift + 1–9: starting chances for every Garden match
         const digit = /^(Digit|Numpad)([1-9])$/.exec(e.code)?.[2];
@@ -632,6 +641,7 @@ function HelpOverlay({ onClose }: { onClose: () => void }) {
           </table>
           <ul className="mt-6 space-y-1.5 text-base text-[var(--text-dim)]">
             <li><Kbd>Space</Kbd> start both timers together (a stopped one resumes)</li>
+            <li>Polygame: <Kbd>R</Kbd> / <Kbd>U</Kbd> pin or unpin team 1 / team 2 (or click the PINNED badge to remove it)</li>
             <li>Garden: click the chances number (right click gives one back) or <Kbd>E</Kbd>/<Kbd>D</Kbd> team 1, <Kbd>I</Kbd>/<Kbd>J</Kbd> team 2 · <Kbd>Shift</Kbd>+<Kbd>1–9</Kbd> starting chances</li>
             <li>Matches screen: <Kbd>N</Kbd> new match (then 1–9 twice) · click a card to open · hover + <Kbd>Del</Kbd> twice to remove · <Kbd>Z</Kbd> back to the list from any screen</li>
             <li><Kbd>→</Kbd> next screen (Polygame → Phase Stats → Game Stats → Leaderboard) · <Kbd>←</Kbd> back</li>

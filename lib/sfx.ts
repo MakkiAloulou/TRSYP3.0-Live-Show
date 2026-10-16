@@ -167,6 +167,16 @@ export const sfx = {
     tone({ freq: 140, to: 620, dur, type: "sawtooth", gain: 0.05, attack: dur * 0.5, at });
   },
 
+  /** PINNED: a heavy metallic clamp. */
+  pin(at = 0) {
+    tone({ freq: 180, to: 90, dur: 0.35, type: "square", gain: 0.22, attack: 0.002, at, wet: true });
+    noise({ dur: 0.12, filter: "highpass", from: 2500, gain: 0.25, attack: 0.002, at });
+    tone({ freq: 1250, dur: 0.5, type: "triangle", gain: 0.06, at: at + 0.02, wet: true });
+  },
+  unpin(at = 0) {
+    tone({ freq: 300, to: 700, dur: 0.15, type: "triangle", gain: 0.14, at });
+  },
+
   /** Diving into a match card: rising sweep + bright lock-on. */
   zoomIn(at = 0) {
     noise({ dur: 0.7, from: 300, to: 7000, q: 2, gain: 0.3, attack: 0.55, at });

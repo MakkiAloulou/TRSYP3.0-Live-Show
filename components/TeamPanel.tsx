@@ -62,6 +62,20 @@ export default function TeamPanel({ id, team, dispatch, active, variant = "polyg
           <span className="blink absolute right-6 top-5 flex items-center gap-2 text-xs font-semibold tracking-[0.3em] text-[var(--pink)]">
             <span className="h-2 w-2 rounded-full bg-[var(--pink)]" /> LIVE
           </span>
+          {variant === "polygame" && team.pinned && (
+            <button
+              onClick={() => {
+                sfx.unpin();
+                dispatch({ type: "togglePin", team: id });
+              }}
+              aria-label="Pinned — click to remove"
+              className="slam absolute bottom-6 left-1/2 flex -translate-x-1/2 cursor-pointer items-center gap-3 border-2 border-[var(--cell-red)] bg-[#1a0610]/85 px-6 py-2 font-[family-name:var(--font-display)] text-[38px] uppercase leading-none tracking-[0.2em] text-[var(--cell-red)] shadow-[0_0_24px_rgba(242,85,107,0.55)]"
+              style={{ textShadow: "0 0 14px rgba(242,85,107,0.8)" }}
+            >
+              <PinIcon />
+              Pinned
+            </button>
+          )}
         </div>
       </HudFrame>
 
@@ -143,6 +157,15 @@ export default function TeamPanel({ id, team, dispatch, active, variant = "polyg
         </div>
       </HudFrame>
     </section>
+  );
+}
+
+function PinIcon() {
+  return (
+    <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M12 17v5" />
+      <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z" />
+    </svg>
   );
 }
 

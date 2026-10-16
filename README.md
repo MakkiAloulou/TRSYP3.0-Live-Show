@@ -23,6 +23,7 @@ A fixed 1920×1080 stage that scales to the window. Two teams, each with:
 - **Shapes board** — 35 pieces in a flat top view (5 columns × green triangle, red/blue top triangle, red/blue cube, red/blue bottom triangle). Pieces are numbered 1–30 zigzagging down each column (greens unnumbered). Left click removes a piece (dashed outline stays; left click again brings it back). Right click greys it (right click again restores).
 - **5×5 grid** — each square is split on its diagonal into two triangles. Left click colours the whole square (no diagonal shown), right click colours one triangle (the diagonal stays, drawn clearly). Colours cycle white → red → blue → white. To number a square, hover it and type digits: a full square gets one number, a split square gets one per triangle. `Backspace` deletes a digit, `Delete` clears.
 - **Timer** (counts up) and **current total** (manual).
+- **PINNED** — `R` (team 1) / `U` (team 2) puts a red "PINNED" badge with a pin icon on that team's camera; press again or click the badge to remove it.
 
 State is saved in the browser, so a refresh mid-match keeps everything.
 
