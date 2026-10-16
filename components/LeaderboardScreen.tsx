@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { matchGains, type Action, type GameState } from "@/lib/game";
+import { matchGains, reducer, type Action, type GameState } from "@/lib/game";
+
+/** Standings as they will be after this match is added. */
+const reducerPreview = (s: GameState) => reducer(s, { type: "commitMatch" }).league;
+import { sfx } from "@/lib/sfx";
 import { DrawPath, framePath, Line, Reveal } from "./Draw";
 
 /* Overall leaderboard of all 9 teams. Opens on the current standings; if this
@@ -62,11 +66,19 @@ export default function LeaderboardScreen({ on, active, state, dispatch }: Props
     const t = setTimeout(() => {
       const { state: s, dispatch: d } = live.current;
       if (s.matchCommitted) return;
-      setUpdate({
-        gains: matchGains(s),
-        prevRank: Object.fromEntries(s.league.map((l, i) => [l.id, i])),
-      });
+      const gains = matchGains(s);
+      const prevRank = Object.fromEntries(s.league.map((l, i) => [l.id, i]));
+      setUpdate({ gains, prevRank });
       d({ type: "commitMatch" });
+
+      // sounds: +N chime and ticking points, rows sliding, then up / down markers
+      const after = reducerPreview(s);
+      const moves = after.map((l, i) => prevRank[l.id] - i);
+      sfx.gain();
+      sfx.countTicks(1, 0.05);
+      if (moves.some((m) => m !== 0)) sfx.rowSlide(0.65);
+      if (moves.some((m) => m > 0)) sfx.rankUp((MOVE_MS + 500) / 1000);
+      if (moves.some((m) => m < 0)) sfx.rankDown((MOVE_MS + 650) / 1000);
     }, UPDATE_AFTER_MS);
     return () => clearTimeout(t);
   }, [on]);
@@ -79,6 +91,7 @@ export default function LeaderboardScreen({ on, active, state, dispatch }: Props
       const key = digit ?? (e.key === "Backspace" || e.key === "Delete" ? e.key : null);
       if (!key) return;
       e.preventDefault();
+      sfx.keyTick();
       live.current.dispatch({ type: "editLeaguePoints", id: hover.current, key });
     };
     window.addEventListener("keydown", down);

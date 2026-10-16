@@ -2,6 +2,7 @@
 
 import { useEffect, useReducer, useRef, useState } from "react";
 import { initialState, reducer, type GameState } from "@/lib/game";
+import { isMuted, onMuteChange, setMuted, sfx } from "@/lib/sfx";
 import HudFrame from "./HudFrame";
 import ParticleField from "./ParticleField";
 import ScanBar, { SCAN_W } from "./ScanBar";
@@ -61,10 +62,32 @@ const tween = (ms: number, frame: (p: number) => void) =>
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/** Sounds while a screen draws itself in (times match each screen's animation). */
+const drawSounds = (i: number) => {
+  if (i === 0) return;
+  sfx.scribble(1.4, 0.05);
+  if (i === 1) sfx.countTicks(0.9, 0.9); // phase values + totals
+  if (i === 2) sfx.countTicks(1.5, 0.95); // big totals
+  if (i === 3) sfx.countTicks(1.2, 0.8); // leaderboard points
+};
+
 export default function PolygameScreen() {
   const [state, dispatch] = useReducer(reducer, undefined, initialState);
   const [scale, setScale] = useState(1);
   const [help, setHelp] = useState(false);
+  const [muted, setMutedState] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setMutedState(isMuted()), 0);
+    const off = onMuteChange(setMutedState);
+    return () => {
+      clearTimeout(t);
+      off();
+    };
+  }, []);
+  const stateRef = useRef(state);
+  useEffect(() => {
+    stateRef.current = state;
+  });
   const resetArm = useRef(0);
 
   // Screen switching. Screens are stacked top→bottom in this order; → wipes the
@@ -96,12 +119,14 @@ export default function PolygameScreen() {
     viewRef.current = i + 1;
     setViewIdx(i + 1);
     let started = false;
+    sfx.whoosh(WIPE_MS / 1000);
     await tween(WIPE_MS, (p) => {
       placeWipe(i, easeInOut(p) * (STAGE_W + SCAN_W), true);
       // start drawing the next screen while the bar is still crossing
       if (!started && p > 0.45) {
         started = true;
         setDrawnAt(i + 1, true);
+        drawSounds(i + 1);
       }
     });
     setDrawnAt(i, false); // fully hidden now; reset so it draws in fresh on return
@@ -116,6 +141,8 @@ export default function PolygameScreen() {
     setDrawnAt(i, false); // the current screen un-draws first
     await wait(420);
     setDrawnAt(i - 1, true);
+    sfx.whoosh(WIPE_MS / 1000);
+    drawSounds(i - 1);
     // mirrored bar trails to the right of the edge, so run it past 0 to leave the screen
     await tween(WIPE_MS, (p) => placeWipe(i - 1, (1 - easeInOut(p)) * (STAGE_W + 2 * SCAN_W) - SCAN_W, false));
     viewRef.current = i - 1;
@@ -185,6 +212,10 @@ export default function PolygameScreen() {
         setHelp((h) => !h);
         return;
       }
+      if (e.key.toLowerCase() === "m") {
+        setMuted(!isMuted());
+        return;
+      }
       // Game controls only work on the Polygame screen
       if (viewRef.current !== 0) return;
 
@@ -192,6 +223,8 @@ export default function PolygameScreen() {
         e.preventDefault();
         // Don't let Space also "click" a focused grid square / shape
         (document.activeElement as HTMLElement | null)?.blur();
+        if (stateRef.current.teams.some((t) => t.timer.running)) sfx.timerPause();
+        else sfx.timerStart();
         dispatch({ type: "toggleBoth", now });
         return;
       }
@@ -200,6 +233,7 @@ export default function PolygameScreen() {
       if (letter === "x" && e.shiftKey) {
         if (now - resetArm.current < 2000) {
           dispatch({ type: "resetAll" });
+          sfx.newMatch();
           resetArm.current = 0;
         } else {
           resetArm.current = now;
@@ -209,9 +243,18 @@ export default function PolygameScreen() {
       const k = KEYS[letter as keyof typeof KEYS];
       if (!k) return;
       e.preventDefault();
-      if (k.type === "points") dispatch({ type: "addPoints", team: k.team, delta: k.delta * (e.shiftKey ? 5 : 1) });
-      else if (k.type === "toggleTimer") dispatch({ type: "toggleTimer", team: k.team, now });
-      else dispatch({ type: "resetTimer", team: k.team });
+      if (k.type === "points") {
+        if (k.delta > 0) sfx.pointUp();
+        else sfx.pointDown();
+        dispatch({ type: "addPoints", team: k.team, delta: k.delta * (e.shiftKey ? 5 : 1) });
+      } else if (k.type === "toggleTimer") {
+        if (stateRef.current.teams[k.team].timer.running) sfx.timerPause();
+        else sfx.timerStart();
+        dispatch({ type: "toggleTimer", team: k.team, now });
+      } else {
+        sfx.timerPause();
+        dispatch({ type: "resetTimer", team: k.team });
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -283,6 +326,17 @@ export default function PolygameScreen() {
         <ScanBar ref={barRef} />
 
         {help && <HelpOverlay onClose={() => setHelp(false)} />}
+
+        {/* only the operator needs this: shows while sound is muted */}
+        {muted && (
+          <div className="absolute bottom-3 right-4 z-[60] flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.3em] text-[var(--text-dim)] opacity-70">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+              <path d="M11 5 6 9H2v6h4l5 4V5z" />
+              <path d="m23 9-6 6M17 9l6 6" />
+            </svg>
+            Muted (M)
+          </div>
+        )}
       </div>
       </div>
     </main>
@@ -328,7 +382,7 @@ function HelpOverlay({ onClose }: { onClose: () => void }) {
             <li>Shapes: left click removes / brings back · right click greys / restores</li>
             <li>Grid: left click colours the whole square · right click colours one triangle (white → red → blue)</li>
             <li>Grid numbers: hover a square / triangle and type digits · <Kbd>Backspace</Kbd> deletes · <Kbd>Del</Kbd> clears</li>
-            <li>Double-click a team name to rename · <Kbd>H</Kbd> toggles this panel</li>
+            <li>Double-click a team name to rename · <Kbd>H</Kbd> toggles this panel · <Kbd>M</Kbd> mute / unmute sound</li>
           </ul>
         </div>
       </HudFrame>

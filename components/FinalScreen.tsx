@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type CSSProperties } from "react";
 import { teamTotal, type TeamId, type TeamState } from "@/lib/game";
+import { sfx } from "@/lib/sfx";
 import { CountUp, DrawPath, framePath, Line, Reveal, timing } from "./Draw";
 
 /* Game Stats: both teams' total score (from Phase Stats). 6 s after the
@@ -38,7 +39,15 @@ export default function FinalScreen({ on, teams }: Props) {
 
   // Reveal 6 s after the screen draws in; hide at once when leaving
   useEffect(() => {
-    const t = setTimeout(() => setReveal(on), on ? REVEAL_AFTER_MS : 0);
+    const t = setTimeout(() => {
+      setReveal(on);
+      if (!on) return;
+      // line → decoder chatter → slam + shockwave shimmer
+      sfx.rowSlide(T_LINE / 1000);
+      sfx.decode(0.95, T_CAPTION / 1000);
+      sfx.slam(T_SLAM / 1000);
+      sfx.shimmer((T_SLAM + 120) / 1000);
+    }, on ? REVEAL_AFTER_MS : 0);
     return () => clearTimeout(t);
   }, [on]);
 

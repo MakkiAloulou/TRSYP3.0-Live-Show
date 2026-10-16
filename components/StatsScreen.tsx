@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 import { teamTotal, type Action, type StatField, type TeamId, type TeamState } from "@/lib/game";
+import { sfx } from "@/lib/sfx";
 import { CountUp, framePath, Line, Reveal, timing } from "./Draw";
 
 /* Phase Stats: a table that draws itself like a pen stroke when `on` turns
@@ -51,6 +52,7 @@ export default function StatsScreen({ on, active, teams, dispatch }: Props) {
       const key = statKey(e);
       if (!key) return;
       e.preventDefault();
+      sfx.keyTick();
       dispatch({ type: "editStat", team: hover.current.team, field: hover.current.field, key });
     };
     window.addEventListener("keydown", down);

@@ -29,6 +29,10 @@ Press `→` from Game Stats. All 9 teams (placeholders for now; everyone starts 
 
 Fix things by hand: hover a team's points and type; double-click a name to rename. `Shift+X` twice starts a new match (clears boards, timers, points and stats, keeps the leaderboard).
 
+## Sound
+
+All sound effects are synthesised in the browser (Web Audio, no files): timer beeps, point blips, shape zaps, grid ticks, the scan-bar whoosh, line-drawing scribble, count-up ticks, the decoder chatter and the big slam on the dominant team, and leaderboard chimes / slides. `M` mutes (a small "Muted" tag shows bottom-right). Sound starts after the first key press. When screen sharing, enable "share sound".
+
 ### Keyboard
 
 | Action | Team 1 | Team 2 |
@@ -42,6 +46,7 @@ Fix things by hand: hover a team's points and type; double-click a name to renam
 - `Space` — start / pause both timers (Polygame screen)
 - `Shift+X` twice within 2 s — new match (keeps the leaderboard)
 - `H` — show / hide the controls panel
+- `M` — mute / unmute sound
 - Double-click a team name to rename it (defaults: CUBOT, TEST 2)
 
 ## Run

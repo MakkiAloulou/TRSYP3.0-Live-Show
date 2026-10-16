@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { elapsedMs, formatTime, type Action, type TeamId, type TeamState, type TimerState } from "@/lib/game";
+import { sfx } from "@/lib/sfx";
 import ColorGrid from "./ColorGrid";
 import HudFrame from "./HudFrame";
 import ShapesBoard from "./ShapesBoard";
@@ -66,7 +67,15 @@ export default function TeamPanel({ id, team, dispatch, active }: Props) {
           <div className="flex h-full flex-col px-5 pb-3 pt-3">
             <Label>Shapes</Label>
             <div className="min-h-0 flex-1 pt-1">
-              <ShapesBoard shapes={team.shapes} onChange={(sid, state) => dispatch({ type: "setShape", team: id, id: sid, state })} />
+              <ShapesBoard
+                shapes={team.shapes}
+                onChange={(sid, state) => {
+                  if (state === "removed") sfx.shapeRemove();
+                  else if (state === "grey") sfx.shapeGrey();
+                  else sfx.shapeRestore();
+                  dispatch({ type: "setShape", team: id, id: sid, state });
+                }}
+              />
             </div>
           </div>
         </HudFrame>
@@ -77,9 +86,18 @@ export default function TeamPanel({ id, team, dispatch, active }: Props) {
               <ColorGrid
                 grid={team.grid}
                 active={active}
-                onCell={(i, half) => dispatch({ type: "cycleCell", team: id, index: i, half })}
-                onHalf={(i, half) => dispatch({ type: "cycleHalf", team: id, index: i, half })}
-                onKey={(i, half, key) => dispatch({ type: "editLabel", team: id, index: i, half, key })}
+                onCell={(i, half) => {
+                  sfx.gridTick();
+                  dispatch({ type: "cycleCell", team: id, index: i, half });
+                }}
+                onHalf={(i, half) => {
+                  sfx.gridTick();
+                  dispatch({ type: "cycleHalf", team: id, index: i, half });
+                }}
+                onKey={(i, half, key) => {
+                  sfx.keyTick();
+                  dispatch({ type: "editLabel", team: id, index: i, half, key });
+                }}
               />
             </div>
           </div>
