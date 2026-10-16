@@ -31,8 +31,9 @@ const KEYS = {
 } as const;
 
 const VIEWS = ["game", "stats", "final", "board"] as const;
-/** Which screens each game walks through with → (Garden has no Phase Stats). */
-const SEQ: Record<GameKind, number[]> = { polygame: [0, 1, 2, 3], garden: [0, 2, 3], game3: [0, 2, 3] };
+/** Which screens each game walks through with →. Layer 1 is Phase Stats for Polygame,
+    and the Game Stats details table for Garden / Mine. */
+const SEQ: Record<GameKind, number[]> = { polygame: [0, 1, 2, 3], garden: [0, 1, 2, 3], game3: [0, 1, 2, 3] };
 
 const WIPE_MS = 820;
 const easeInOut = (p: number) => (p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2);
@@ -496,7 +497,7 @@ export default function PolygameScreen() {
 
         {/* Phase Stats */}
         <div ref={(el) => void (layerRefs.current[1] = el)} inert={view !== "stats"} className="absolute inset-0 z-20">
-          <StatsScreen on={drawn[1]} active={!listOpen && view === "stats"} teams={state.teams} dispatch={dispatch} />
+          <StatsScreen on={drawn[1]} active={!listOpen && view === "stats"} game={state.game} teams={state.teams} dispatch={dispatch} />
         </div>
 
         {/* Top: Polygame screen (opaque), clipped away by the scan bar on → */}

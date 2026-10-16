@@ -31,6 +31,12 @@ export interface TeamStats {
   ph1: string;
   ph2: string;
   ph3: string;
+  /** Mine */
+  edge: string;
+  cube: string;
+  mine: string;
+  /** Garden / Mine: final score of the game (typed; empty = use the screen's current total) */
+  final: string;
 }
 export type StatField = keyof TeamStats;
 
@@ -202,6 +208,10 @@ const freshStats = (): TeamStats => ({
   ph1: "",
   ph2: "",
   ph3: "",
+  edge: "",
+  cube: "",
+  mine: "",
+  final: "",
 });
 
 const freshTeam = (name: string): TeamState => ({
@@ -291,8 +301,13 @@ export const carriedIn = (s: GameState, team: TeamId): number => {
   return slotCarry(m, s.game, team);
 };
 
-/** Points a team scored in one game of a match. Polygame = Phase total; Garden = its points counter. */
-export const gameScore = (game: GameKind, t: TeamState) => (game === "polygame" ? teamTotal(t.stats) : t.points);
+/** Points a team scored in one game of a match. Polygame = Phase total; Garden / Mine = the typed
+    final score, or the screen's points counter until one is typed. */
+export const gameScore = (game: GameKind, t: TeamState) => {
+  if (game === "polygame") return teamTotal(t.stats);
+  const typed = parseFloat(t.stats.final);
+  return Number.isFinite(typed) ? typed : t.points;
+};
 
 /** Sum of the games before `game` for this match. */
 export const slotCarry = (m: Match, game: GameKind, team: TeamId) =>

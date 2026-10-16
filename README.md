@@ -47,11 +47,13 @@ Fix things by hand: hover a team's points and type; double-click a name to renam
 
 Same screen as Polygame, but under each camera there's a big **CHANCES LEFT** number instead of the shapes and grid. Left-click it (or `E` team 1 / `I` team 2) to use a chance, right-click (or `D` / `J`) to give one back. At 0 it turns red and **OUT** flashes. `Shift+1–9` sets the starting chances for every Garden match. The current total starts at the team's Polygame total.
 
-Flow: Garden → **Game Stats** (no Phase Stats; cumulative scores and the dominant team) → **Leaderboard** (adds only the points earned in Garden).
+Flow: Garden → **Game Stats details** (Time + bonus, Position 1st/2nd + bonus, **Final score**) → **Game Stats** (cumulative total and the dominant team) → **Leaderboard** (adds only the Garden final score).
 
 ## Game 3 — Mine
 
-Same screen with only the cameras and the timer / current total (empty space below the cameras). The current total starts at Polygame + Garden. Flow: Mine → **Game Stats** (cumulative, dominant team) → **Leaderboard** (adds only the Mine points).
+Same screen with only the cameras and the timer / current total (empty space below the cameras). The current total starts at Polygame + Garden. Flow: Mine → **Game Stats details** (Time + bonus, Edge contact, Cube drop, Mine contact, **Final score**) → **Game Stats** (cumulative total, dominant team) → **Leaderboard** (adds only the Mine final score).
+
+The **Final score** on the details screens is typed by hovering it; until something is typed it shows (dimmed) the game's current total, and that is what's used.
 
 ## Sound
 

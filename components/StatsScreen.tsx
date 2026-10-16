@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useRef, type ReactNode } from "react";
-import { teamTotal, type Action, type StatField, type TeamId, type TeamState } from "@/lib/game";
+import { GAME_INFO, teamTotal, type Action, type GameKind, type StatField, type TeamId, type TeamState } from "@/lib/game";
 import { sfx } from "@/lib/sfx";
 import { CountUp, framePath, Line, Reveal, timing } from "./Draw";
 
-/* Phase Stats: a table that draws itself like a pen stroke when `on` turns
-   true, and un-draws (last pieces first, quicker) when it turns false.
-   Every value is typed by hovering it — same as the grid. */
+/* Phase Stats (Polygame) / Game Stats details (Garden, Mine): a table that
+   draws itself like a pen stroke when `on` turns true, and un-draws (last
+   pieces first, quicker) when it turns false. Every value is typed by
+   hovering it — same as the grid. */
 
 // Stage layout (1920×1080 px)
 const X0 = 150;
@@ -18,28 +19,51 @@ const MID = 960;
 const CUT = 28;
 const TITLE_Y = 212;
 const PAD = 70;
-const ROW_LINES = [336, 432, 528, 624];
+const ROW0 = 336;
+const ROW_H = 96;
 const PH_TOP = 668;
 const PH_BOT = 790;
 const TOTAL_LINE = 968;
 
 const halfX = (t: TeamId) => (t === 0 ? [X0 + PAD, MID - PAD] : [MID + PAD, X1 - PAD]);
 
-const ROWS: { label: string; value: StatField; plus: StatField; kind: "time" | "position" | "accuracy" }[] = [
-  { label: "Time", value: "time", plus: "timePlus", kind: "time" },
-  { label: "Position", value: "position", plus: "positionPlus", kind: "position" },
-  { label: "Accuracy", value: "accuracy", plus: "accuracyPlus", kind: "accuracy" },
-];
+type RowKind = "time" | "position" | "accuracy" | "number";
+interface Row {
+  label: string;
+  value: StatField;
+  /** bonus field (omitted = no bonus on this row) */
+  plus?: StatField;
+  kind: RowKind;
+}
+
+const TIME: Row = { label: "Time", value: "time", plus: "timePlus", kind: "time" };
+const POSITION: Row = { label: "Position", value: "position", plus: "positionPlus", kind: "position" };
+const ROWS: Record<GameKind, Row[]> = {
+  polygame: [TIME, POSITION, { label: "Accuracy", value: "accuracy", plus: "accuracyPlus", kind: "accuracy" }],
+  garden: [TIME, POSITION],
+  game3: [
+    TIME,
+    { label: "Edge contact", value: "edge", kind: "number" },
+    { label: "Cube drop", value: "cube", kind: "number" },
+    { label: "Mine contact", value: "mine", kind: "number" },
+  ],
+};
 const PHASES: StatField[] = ["ph1", "ph2", "ph3"];
 
 interface Props {
   on: boolean;
   active: boolean;
+  game: GameKind;
   teams: [TeamState, TeamState];
   dispatch: (a: Action) => void;
 }
 
-export default function StatsScreen({ on, active, teams, dispatch }: Props) {
+export default function StatsScreen({ on, active, game, teams, dispatch }: Props) {
+  const rows = ROWS[game];
+  const phases = game === "polygame"; // Polygame: Phase 1–3 box; others: one final score
+  const ROW_LINES = Array.from({ length: rows.length + 1 }, (_, i) => ROW0 + i * ROW_H);
+  const rowsEnd = ROW_LINES[ROW_LINES.length - 1];
+  const hasBonus = rows.some((r) => r.plus);
   const hover = useRef<{ team: TeamId; field: StatField } | null>(null);
   const activeRef = useRef(active);
   useEffect(() => {
@@ -97,17 +121,21 @@ export default function StatsScreen({ on, active, teams, dispatch }: Props) {
                 {ROW_LINES.map((y, i) => (
                   <Line key={y} on={on} d={640 + i * 70 + o} dur={480} x1={a} y1={y} x2={b} y2={y} />
                 ))}
-                {/* phase score box */}
-                <path
-                  pathLength={1}
-                  className={`draw ${on ? "on" : ""}`}
-                  style={timing(on, 940 + o, 620)}
-                  stroke="var(--neon)"
-                  strokeWidth={1.6}
-                  d={`M ${a} ${PH_TOP} L ${b} ${PH_TOP} L ${b} ${PH_BOT} L ${a} ${PH_BOT} Z`}
-                />
-                <Line on={on} d={1160 + o} dur={260} x1={a + third} y1={PH_TOP} x2={a + third} y2={PH_BOT} strong />
-                <Line on={on} d={1220 + o} dur={260} x1={a + 2 * third} y1={PH_TOP} x2={a + 2 * third} y2={PH_BOT} strong />
+                {/* phase score box (Polygame only) */}
+                {phases && (
+                  <>
+                    <path
+                      pathLength={1}
+                      className={`draw ${on ? "on" : ""}`}
+                      style={timing(on, 940 + o, 620)}
+                      stroke="var(--neon)"
+                      strokeWidth={1.6}
+                      d={`M ${a} ${PH_TOP} L ${b} ${PH_TOP} L ${b} ${PH_BOT} L ${a} ${PH_BOT} Z`}
+                    />
+                    <Line on={on} d={1160 + o} dur={260} x1={a + third} y1={PH_TOP} x2={a + third} y2={PH_BOT} strong />
+                    <Line on={on} d={1220 + o} dur={260} x1={a + 2 * third} y1={PH_TOP} x2={a + 2 * third} y2={PH_BOT} strong />
+                  </>
+                )}
                 <Line on={on} d={1320 + o} dur={420} x1={(a + b) / 2 - 110} y1={TOTAL_LINE} x2={(a + b) / 2 + 110} y2={TOTAL_LINE} pink />
               </g>
             );
@@ -118,10 +146,10 @@ export default function StatsScreen({ on, active, teams, dispatch }: Props) {
       {/* ── Title ── */}
       <Reveal on={on} d={320} className="absolute left-0 right-0 text-center" style={{ top: Y0 + 26 }}>
         <div className="text-[15px] font-semibold uppercase tracking-[0.55em] text-[var(--text-dim)]">
-          TRSYP 3.0 · Polygame
+          TRSYP 3.0 · {GAME_INFO[game].title}
         </div>
         <h1 className="neon-text mt-1 font-[family-name:var(--font-display)] text-[68px] uppercase leading-none tracking-[0.22em]">
-          Phase Stats
+          {phases ? "Phase Stats" : "Game Stats"}
         </h1>
       </Reveal>
 
@@ -132,6 +160,7 @@ export default function StatsScreen({ on, active, teams, dispatch }: Props) {
         const st = teams[t].stats;
         const o = t * 60;
         const total = teamTotal(st);
+        const finalTyped = st.final !== "";
         return (
           <div key={t}>
             {/* team name */}
@@ -147,17 +176,17 @@ export default function StatsScreen({ on, active, teams, dispatch }: Props) {
             </div>
 
             {/* column header over the bonus points */}
-            <Reveal
+            {hasBonus && <Reveal
               on={on}
               d={740 + o}
               className="absolute pr-2 text-right text-[13px] font-semibold uppercase tracking-[0.4em] text-[var(--pink)]"
               style={{ left: a, width: w, top: ROW_LINES[0] - 26 }}
             >
               Bonus
-            </Reveal>
+            </Reveal>}
 
-            {/* time / position / accuracy */}
-            {ROWS.map((r, i) => {
+            {/* one row per stat */}
+            {rows.map((r, i) => {
               const top = ROW_LINES[i];
               const h = ROW_LINES[i + 1] - top;
               return (
@@ -176,14 +205,14 @@ export default function StatsScreen({ on, active, teams, dispatch }: Props) {
                     {field(t, r.value, <Value raw={st[r.value]} kind={r.kind} on={on} delay={900 + i * 80 + o} blank />)}
                   </span>
                   <span className="digits w-[28%] pr-2 text-right text-[40px] leading-none">
-                    {field(t, r.plus, <Bonus raw={st[r.plus]} />)}
+                    {r.plus && field(t, r.plus, <Bonus raw={st[r.plus]} />)}
                   </span>
                 </Reveal>
               );
             })}
 
             {/* phase scores */}
-            {PHASES.map((f, i) => (
+            {phases && PHASES.map((f, i) => (
               <Reveal
                 key={f}
                 on={on}
@@ -200,20 +229,47 @@ export default function StatsScreen({ on, active, teams, dispatch }: Props) {
               </Reveal>
             ))}
 
-            {/* total */}
-            <Reveal
-              on={on}
-              d={1330 + o}
-              className="absolute flex flex-col items-center"
-              style={{ left: a, width: w, top: PH_BOT + 34 }}
-            >
-              <span className="text-[17px] font-semibold uppercase tracking-[0.5em] text-[var(--text-dim)]">
-                Total score
-              </span>
-              <span className="digits pink-text mt-1 text-[96px] leading-none">
-                <CountUp value={total} on={on} delay={1400 + o} />
-              </span>
-            </Reveal>
+            {/* total (Polygame) / final score of this game (Garden, Mine) */}
+            {phases ? (
+              <Reveal
+                on={on}
+                d={1330 + o}
+                className="absolute flex flex-col items-center"
+                style={{ left: a, width: w, top: PH_BOT + 34 }}
+              >
+                <span className="text-[17px] font-semibold uppercase tracking-[0.5em] text-[var(--text-dim)]">
+                  Total score
+                </span>
+                <span className="digits pink-text mt-1 text-[96px] leading-none">
+                  <CountUp value={total} on={on} delay={1400 + o} />
+                </span>
+              </Reveal>
+            ) : (
+              <Reveal
+                on={on}
+                d={1250 + o}
+                className="absolute flex flex-col items-center"
+                style={{ left: a, width: w, top: rowsEnd + (TOTAL_LINE - rowsEnd) / 2 - 92 }}
+              >
+                <span className="text-[17px] font-semibold uppercase tracking-[0.5em] text-[var(--text-dim)]">
+                  Final score
+                </span>
+                <span className="digits pink-text mt-1 text-[110px] leading-none">
+                  {field(
+                    t,
+                    "final",
+                    finalTyped ? (
+                      <Value raw={st.final} kind="number" on={on} delay={1350 + o} />
+                    ) : (
+                      // nothing typed yet: show this game's points counter, dimmed
+                      <span className="opacity-60">
+                        <CountUp value={teams[t].points} on={on} delay={1350 + o} />
+                      </span>
+                    ),
+                  )}
+                </span>
+              </Reveal>
+            )}
           </div>
         );
       })}
