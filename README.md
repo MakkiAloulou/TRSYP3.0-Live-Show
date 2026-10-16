@@ -17,7 +17,7 @@ State is saved in the browser, so a refresh mid-match keeps everything.
 
 Press `→` on the Polygame screen: a neon scan bar wipes it away, then the stats table draws itself line by line, team names glitch in and numbers count up. `←` plays it in reverse.
 
-Each team shows Time, Position and Accuracy (each with its own "+" points), Phase 1–3 scores and the **total score** (= Phase 1 + Phase 2 + Phase 3). Everything is typed by hand: hover a value and type (digits `:` `.` `%` `-`). `Backspace` deletes, `Delete` clears. Position shows as 1st / 2nd…, and accuracy gets a `%` automatically.
+Each team shows Time (compared against a fixed 5:00 — green "<" under, red ">" over), Position and Accuracy, each with a bonus typed by hand, Phase 1–3 scores and the **total score** (= Phase 1 + Phase 2 + Phase 3). Everything is typed by hand: hover a value and type (digits `:` `.` `%` `-`). `Backspace` deletes, `Delete` clears. Position shows as 1st / 2nd…, and accuracy gets a `%` automatically.
 
 ### Keyboard
 

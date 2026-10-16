@@ -68,7 +68,7 @@ export default function StatsScreen({ on, active, teams, dispatch }: Props) {
     <span
       onPointerEnter={() => (hover.current = { team, field: f })}
       onPointerLeave={() => (hover.current = null)}
-      className={`inline-block min-w-[2ch] cursor-text px-1.5 outline-offset-4 hover:outline-1 hover:outline-dashed hover:outline-[var(--pink-dim)] ${className}`}
+      className={`inline-block min-h-[1em] min-w-[3ch] cursor-text px-1.5 outline-offset-4 hover:outline-1 hover:outline-dashed hover:outline-[var(--pink-dim)] ${className}`}
     >
       {children}
     </span>
@@ -168,10 +168,10 @@ export default function StatsScreen({ on, active, teams, dispatch }: Props) {
                     {r.label}
                   </span>
                   <span className="digits w-[38%] text-center text-[48px] leading-none text-[var(--text)]">
-                    {field(t, r.value, <Value raw={st[r.value]} kind={r.kind} on={on} delay={900 + i * 80 + o} />)}
+                    {field(t, r.value, <Value raw={st[r.value]} kind={r.kind} on={on} delay={900 + i * 80 + o} blank />)}
                   </span>
                   <span className="digits w-[28%] pr-2 text-right text-[40px] leading-none">
-                    {field(t, r.plus, <Plus raw={st[r.plus]} />)}
+                    {field(t, r.plus, <Bonus raw={st[r.plus]} />)}
                   </span>
                 </Reveal>
               );
@@ -249,9 +249,35 @@ function Reveal({
 const EMPTY = <span className="text-[var(--neon-dim)]">—</span>;
 const NUMERIC = /^-?\d+(\.\d+)?$/;
 
-function Value({ raw, kind, on, delay }: { raw: string; kind: "time" | "position" | "accuracy" | "number"; on: boolean; delay: number }) {
-  if (!raw) return EMPTY;
-  if (kind === "time" || !NUMERIC.test(raw)) return <>{raw}</>;
+/** Time limit the time row is compared against (fixed). */
+const TIME_LIMIT_S = 5 * 60;
+
+/** "4:12" → 252 s; "4" or "4.5" → minutes. null if it can't be read. */
+const toSeconds = (raw: string): number | null => {
+  const m = /^(\d+):(\d{1,2})(?:\.\d+)?$/.exec(raw);
+  if (m) return +m[1] * 60 + +m[2];
+  return NUMERIC.test(raw) ? parseFloat(raw) * 60 : null;
+};
+
+function Value({
+  raw, kind, on, delay, blank,
+}: { raw: string; kind: "time" | "position" | "accuracy" | "number"; on: boolean; delay: number; blank?: boolean }) {
+  if (!raw) return blank ? null : EMPTY;
+  if (kind === "time") {
+    const secs = toSeconds(raw);
+    if (secs === null) return <>{raw}</>;
+    const under = secs < TIME_LIMIT_S;
+    const sign = under ? "<" : secs > TIME_LIMIT_S ? ">" : "=";
+    return (
+      <>
+        {raw}
+        <span className={`ml-3 text-[0.55em] ${under ? "neon-text" : secs > TIME_LIMIT_S ? "text-[var(--cell-red)]" : "text-[var(--text-dim)]"}`}>
+          {sign} 5:00
+        </span>
+      </>
+    );
+  }
+  if (!NUMERIC.test(raw)) return <>{raw}</>;
   const n = parseFloat(raw);
   if (kind === "position")
     return (
@@ -268,10 +294,10 @@ function Value({ raw, kind, on, delay }: { raw: string; kind: "time" | "position
   );
 }
 
-function Plus({ raw }: { raw: string }) {
-  if (!raw) return <span className="text-[var(--neon-dim)]">+—</span>;
-  const neg = raw.startsWith("-");
-  return <span className={neg ? "text-[var(--cell-red)]" : "neon-text"}>{neg ? raw : `+${raw}`}</span>;
+/** Bonus points: shown exactly as typed, nothing when empty. */
+function Bonus({ raw }: { raw: string }) {
+  if (!raw) return null;
+  return <span className={raw.startsWith("-") ? "text-[var(--cell-red)]" : "neon-text"}>{raw}</span>;
 }
 
 const ordinal = (n: number) => {
