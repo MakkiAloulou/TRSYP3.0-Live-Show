@@ -4,6 +4,8 @@ import { useEffect, useReducer, useRef, useState } from "react";
 import { initialState, reducer, type GameState } from "@/lib/game";
 import HudFrame from "./HudFrame";
 import ParticleField from "./ParticleField";
+import ScanBar, { SCAN_W } from "./ScanBar";
+import StatsScreen from "./StatsScreen";
 import TeamPanel from "./TeamPanel";
 
 const STAGE_W = 1920;
@@ -23,11 +25,84 @@ const KEYS = {
   k: { type: "points", team: 1, delta: -1 },
 } as const;
 
+type View = "game" | "stats";
+
+const WIPE_MS = 820;
+const easeInOut = (p: number) => (p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2);
+
+/** rAF tween 0→1; resolves when done (instantly with reduced motion). */
+const tween = (ms: number, frame: (p: number) => void) =>
+  new Promise<void>((done) => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      frame(1);
+      return done();
+    }
+    const t0 = performance.now();
+    const step = (now: number) => {
+      const p = Math.min(1, (now - t0) / ms);
+      frame(p);
+      if (p < 1) requestAnimationFrame(step);
+      else done();
+    };
+    requestAnimationFrame(step);
+  });
+
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 export default function PolygameScreen() {
   const [state, dispatch] = useReducer(reducer, undefined, initialState);
   const [scale, setScale] = useState(1);
   const [help, setHelp] = useState(false);
   const resetArm = useRef(0);
+
+  // Screen switching: → Phase Stats, ← back to Polygame
+  const [view, setView] = useState<View>("game");
+  const [statsOn, setStatsOn] = useState(false);
+  const viewRef = useRef<View>("game");
+  const busy = useRef(false);
+  const gameRef = useRef<HTMLDivElement>(null);
+  const barRef = useRef<HTMLDivElement>(null);
+
+  // `edge` = x of the wipe line. The game is visible only to the right of it.
+  const placeWipe = (edge: number, movingRight: boolean) => {
+    const g = gameRef.current;
+    const b = barRef.current;
+    if (g) g.style.clipPath = `inset(0 0 0 ${Math.min(Math.max(edge, 0), STAGE_W)}px)`;
+    if (b) b.style.transform = movingRight ? `translateX(${edge - SCAN_W}px)` : `translateX(${edge}px) scaleX(-1)`;
+  };
+
+  const goStats = async () => {
+    if (busy.current || viewRef.current === "stats") return;
+    busy.current = true;
+    viewRef.current = "stats";
+    setView("stats");
+    let started = false;
+    await tween(WIPE_MS, (p) => {
+      placeWipe(easeInOut(p) * (STAGE_W + SCAN_W), true);
+      // start drawing the table while the bar is still crossing
+      if (!started && p > 0.45) {
+        started = true;
+        setStatsOn(true);
+      }
+    });
+    busy.current = false;
+  };
+
+  const goGame = async () => {
+    if (busy.current || viewRef.current === "game") return;
+    busy.current = true;
+    setStatsOn(false); // the table un-draws first
+    await wait(420);
+    // mirrored bar trails to the right of the edge, so run it past 0 to leave the screen
+    await tween(WIPE_MS, (p) => placeWipe((1 - easeInOut(p)) * (STAGE_W + 2 * SCAN_W) - SCAN_W, false));
+    viewRef.current = "game";
+    setView("game");
+    busy.current = false;
+  };
+  const nav = useRef({ goStats, goGame });
+  useEffect(() => {
+    nav.current = { goStats, goGame };
+  });
 
   // Restore saved state (survives a page refresh mid-match). The ref makes it
   // run once even when dev StrictMode re-runs effects.
@@ -38,7 +113,7 @@ export default function PolygameScreen() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       const saved = raw ? (JSON.parse(raw) as GameState) : null;
-      if (saved && Array.isArray(saved.teams?.[0]?.grid?.[0]?.colors)) dispatch({ type: "load", state: saved });
+      if (saved?.teams?.length === 2) dispatch({ type: "load", state: saved }); // "load" fills in anything older saves lack
     } catch {}
   }, []);
 
@@ -62,6 +137,23 @@ export default function PolygameScreen() {
       if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
       const now = Date.now();
 
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        nav.current.goStats();
+        return;
+      }
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        nav.current.goGame();
+        return;
+      }
+      if (e.key.toLowerCase() === "h") {
+        setHelp((h) => !h);
+        return;
+      }
+      // Game controls only work on the Polygame screen
+      if (viewRef.current !== "game") return;
+
       if (e.code === "Space") {
         e.preventDefault();
         // Don't let Space also "click" a focused grid square / shape
@@ -70,10 +162,6 @@ export default function PolygameScreen() {
         return;
       }
       const letter = e.key.toLowerCase();
-      if (letter === "h") {
-        setHelp((h) => !h);
-        return;
-      }
       // Shift+X twice within 2s resets both boards, timers and points
       if (letter === "x" && e.shiftKey) {
         if (now - resetArm.current < 2000) {
@@ -107,6 +195,11 @@ export default function PolygameScreen() {
       >
         <ParticleField />
 
+        <StatsScreen on={statsOn} active={view === "stats"} teams={state.teams} dispatch={dispatch} />
+
+        {/* Polygame screen, clipped away by the scan bar on → */}
+        <div ref={gameRef} inert={view !== "game"} className="absolute inset-0 z-10 bg-[var(--bg)]">
+        <ParticleField />
         <div className="relative flex h-full flex-col gap-4 px-8 pb-6 pt-6">
           {/* Header: game label | POLYGAME */}
           <HudFrame className="h-[96px] w-full shrink-0" cut={20} tracer traceDuration={14}>
@@ -128,16 +221,19 @@ export default function PolygameScreen() {
 
           {/* Two teams, split down the middle */}
           <div className="relative grid min-h-0 flex-1 grid-cols-2 gap-16">
-            <TeamPanel id={0} team={state.teams[0]} dispatch={dispatch} />
+            <TeamPanel id={0} team={state.teams[0]} dispatch={dispatch} active={view === "game"} />
             <div
               className="absolute bottom-2 left-1/2 top-2 w-px -translate-x-1/2 bg-[var(--neon-dim)]"
               aria-hidden
             >
               <span className="absolute left-1/2 top-1/2 h-24 w-[3px] -translate-x-1/2 -translate-y-1/2 bg-[var(--pink)] shadow-[0_0_10px_var(--pink)]" />
             </div>
-            <TeamPanel id={1} team={state.teams[1]} dispatch={dispatch} />
+            <TeamPanel id={1} team={state.teams[1]} dispatch={dispatch} active={view === "game"} />
           </div>
         </div>
+        </div>
+
+        <ScanBar ref={barRef} />
 
         {help && <HelpOverlay onClose={() => setHelp(false)} />}
       </div>
@@ -178,6 +274,8 @@ function HelpOverlay({ onClose }: { onClose: () => void }) {
           </table>
           <ul className="mt-6 space-y-1.5 text-base text-[var(--text-dim)]">
             <li><Kbd>Space</Kbd> start / pause both timers</li>
+            <li><Kbd>→</Kbd> Phase Stats screen · <Kbd>←</Kbd> back to Polygame</li>
+            <li>Phase Stats: hover any value and type (digits : . % -) · <Kbd>Backspace</Kbd> / <Kbd>Del</Kbd></li>
             <li><Kbd>Shift</Kbd>+<Kbd>X</Kbd> twice — reset everything</li>
             <li>Shapes: left click removes / brings back · right click greys / restores</li>
             <li>Grid: left click colours the whole square · right click colours one triangle (white → red → blue)</li>

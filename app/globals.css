@@ -84,3 +84,52 @@ body {
     animation: none;
   }
 }
+
+/* ─── Phase Stats: pen-drawn lines + revealed text ─────────────────── */
+/* Paths use pathLength="1" so every line draws over the same 0→1 range. */
+.draw {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  transition: stroke-dashoffset var(--dur, 700ms) cubic-bezier(0.65, 0, 0.35, 1) var(--delay, 0ms);
+}
+.draw.on {
+  stroke-dashoffset: 0;
+}
+
+.reveal {
+  opacity: 0;
+  clip-path: inset(0 100% 0 0);
+  transform: translateY(8px);
+  transition:
+    opacity 260ms ease-out var(--delay, 0ms),
+    clip-path var(--dur, 520ms) cubic-bezier(0.22, 1, 0.36, 1) var(--delay, 0ms),
+    transform var(--dur, 520ms) cubic-bezier(0.22, 1, 0.36, 1) var(--delay, 0ms);
+}
+.reveal.on {
+  opacity: 1;
+  clip-path: inset(0 0 0 0);
+  transform: none;
+}
+
+/* RGB-split flicker when a team name lands */
+@keyframes glitch {
+  0% { text-shadow: -6px 0 var(--pink), 6px 0 var(--neon); transform: translateX(-4px) skewX(-8deg); }
+  20% { text-shadow: 4px 0 var(--pink), -4px 0 var(--neon); transform: translateX(3px); }
+  40% { text-shadow: -2px 0 var(--pink), 2px 0 var(--neon); transform: translateX(-2px) skewX(4deg); }
+  60% { text-shadow: 2px 0 var(--pink), -1px 0 var(--neon); transform: none; }
+  100% { text-shadow: 0 0 8px rgba(41, 224, 143, 0.65), 0 0 24px rgba(41, 224, 143, 0.35); transform: none; }
+}
+.glitch.on {
+  animation: glitch 520ms steps(6, end) var(--delay, 0ms) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .draw,
+  .reveal {
+    transition-duration: 0ms !important;
+    transition-delay: 0ms !important;
+  }
+  .glitch.on {
+    animation: none;
+  }
+}

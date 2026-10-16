@@ -10,9 +10,11 @@ interface Props {
   id: TeamId;
   team: TeamState;
   dispatch: (a: Action) => void;
+  /** false while another screen is showing, so typing can't edit this grid */
+  active: boolean;
 }
 
-export default function TeamPanel({ id, team, dispatch }: Props) {
+export default function TeamPanel({ id, team, dispatch, active }: Props) {
   const [editing, setEditing] = useState(false);
 
   return (
@@ -74,6 +76,7 @@ export default function TeamPanel({ id, team, dispatch }: Props) {
             <div className="min-h-0 flex-1 pt-2">
               <ColorGrid
                 grid={team.grid}
+                active={active}
                 onCell={(i, half) => dispatch({ type: "cycleCell", team: id, index: i, half })}
                 onHalf={(i, half) => dispatch({ type: "cycleHalf", team: id, index: i, half })}
                 onKey={(i, half, key) => dispatch({ type: "editLabel", team: id, index: i, half, key })}

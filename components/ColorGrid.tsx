@@ -24,18 +24,21 @@ interface Props {
   onCell: (index: number, half: 0 | 1) => void;
   onHalf: (index: number, half: 0 | 1) => void;
   onKey: (index: number, half: 0 | 1, key: string) => void;
+  active: boolean;
 }
 
-export default function ColorGrid({ grid, onCell, onHalf, onKey }: Props) {
+export default function ColorGrid({ grid, onCell, onHalf, onKey, active }: Props) {
   const hover = useRef<{ i: number; h: 0 | 1 } | null>(null);
   const onKeyRef = useRef(onKey);
+  const activeRef = useRef(active);
   useEffect(() => {
     onKeyRef.current = onKey;
+    activeRef.current = active;
   });
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
-      if (!hover.current || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (!activeRef.current || !hover.current || e.ctrlKey || e.metaKey || e.altKey) return;
       // Read the physical key: on AZERTY the top row gives "&é\"'(" without Shift
       const digit = /^(Digit|Numpad)([0-9])$/.exec(e.code)?.[2];
       const key = digit ?? (e.key === "Backspace" || e.key === "Delete" ? e.key : null);

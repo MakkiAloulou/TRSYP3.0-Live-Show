@@ -20,12 +20,27 @@ export interface TimerState {
   accumulated: number; // ms from previous runs
 }
 
+/** Phase Stats screen values — all typed by hand (strings, so "5:32", "87%" etc. work) */
+export interface TeamStats {
+  time: string;
+  timePlus: string;
+  position: string;
+  positionPlus: string;
+  accuracy: string;
+  accuracyPlus: string;
+  ph1: string;
+  ph2: string;
+  ph3: string;
+}
+export type StatField = keyof TeamStats;
+
 export interface TeamState {
   name: string;
   shapes: Record<string, ShapeState>;
   grid: GridCell[];
   timer: TimerState;
   points: number;
+  stats: TeamStats;
 }
 
 export interface GameState {
@@ -37,6 +52,7 @@ export type Action =
   | { type: "cycleHalf"; team: TeamId; index: number; half: 0 | 1 }
   | { type: "cycleCell"; team: TeamId; index: number; half: 0 | 1 }
   | { type: "editLabel"; team: TeamId; index: number; half: 0 | 1; key: string }
+  | { type: "editStat"; team: TeamId; field: StatField; key: string }
   | { type: "toggleTimer"; team: TeamId; now: number }
   | { type: "toggleBoth"; now: number }
   | { type: "resetTimer"; team: TeamId }
@@ -110,12 +126,33 @@ export const SHAPES: ShapeDef[] = Array.from({ length: 5 }, (_, c) => {
 
 const freshTimer = (): TimerState => ({ running: false, startedAt: null, accumulated: 0 });
 
+const freshStats = (): TeamStats => ({
+  time: "",
+  timePlus: "",
+  position: "",
+  positionPlus: "",
+  accuracy: "",
+  accuracyPlus: "",
+  ph1: "",
+  ph2: "",
+  ph3: "",
+});
+
 const freshTeam = (name: string): TeamState => ({
   name,
   shapes: Object.fromEntries(SHAPES.map((s) => [s.id, "normal" as ShapeState])),
   grid: Array.from({ length: 25 }, (): GridCell => ({ colors: [0, 0], full: false, label: "", halfLabels: ["", ""] })),
   timer: freshTimer(),
   points: 0,
+  stats: freshStats(),
+});
+
+/** Fill in anything a save from an older version is missing. */
+export const normalizeState = (s: GameState): GameState => ({
+  teams: s.teams.map((t) => {
+    const base = freshTeam(t.name);
+    return { ...base, ...t, grid: (t.grid ?? base.grid).map(toCell), stats: { ...base.stats, ...t.stats } };
+  }) as GameState["teams"],
 });
 
 export const initialState = (): GameState => ({
@@ -185,6 +222,13 @@ export function reducer(s: GameState, a: Action): GameState {
         halfLabels[a.half] = edit(halfLabels[a.half]);
         return { ...c, halfLabels };
       });
+    case "editStat":
+      // Hover + type. Digits, ":", ".", "%", "-" ; Backspace / Delete
+      return updateTeam(s, a.team, (t) => {
+        const v = t.stats[a.field];
+        const next = a.key === "Backspace" ? v.slice(0, -1) : a.key === "Delete" ? "" : (v + a.key).slice(0, 7);
+        return { ...t, stats: { ...t.stats, [a.field]: next } };
+      });
     case "toggleTimer":
       return updateTeam(s, a.team, (t) => ({ ...t, timer: toggle(t.timer, a.now) }));
     case "toggleBoth": {
@@ -207,7 +251,7 @@ export function reducer(s: GameState, a: Action): GameState {
         teams: s.teams.map((t) => ({ ...freshTeam(t.name) })) as GameState["teams"],
       };
     case "load":
-      return a.state;
+      return normalizeState(a.state);
   }
 }
 

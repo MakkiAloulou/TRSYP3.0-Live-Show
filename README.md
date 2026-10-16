@@ -13,6 +13,12 @@ A fixed 1920×1080 stage that scales to the window. Two teams, each with:
 
 State is saved in the browser, so a refresh mid-match keeps everything.
 
+## Screen 2 — Phase Stats
+
+Press `→` on the Polygame screen: a neon scan bar wipes it away, then the stats table draws itself line by line, team names glitch in and numbers count up. `←` plays it in reverse.
+
+Each team shows Time, Position and Accuracy (each with its own "+" points), Phase 1–3 scores and the **total score** (= Phase 1 + Phase 2 + Phase 3). Everything is typed by hand: hover a value and type (digits `:` `.` `%` `-`). `Backspace` deletes, `Delete` clears. Position shows as 1st / 2nd…, and accuracy gets a `%` automatically.
+
 ### Keyboard
 
 | Action | Team 1 | Team 2 |
@@ -22,7 +28,8 @@ State is saved in the browser, so a refresh mid-match keeps everything.
 | Points +1 (Shift = +5) | `W` | `O` |
 | Points −1 (Shift = −5) | `S` | `K` |
 
-- `Space` — start / pause both timers
+- `→` / `←` — Phase Stats screen / back to Polygame
+- `Space` — start / pause both timers (Polygame screen)
 - `Shift+X` twice within 2 s — reset everything
 - `H` — show / hide the controls panel
 - Double-click a team name to rename it (defaults: CUBOT, TEST 2)

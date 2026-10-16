@@ -1,0 +1,317 @@
+"use client";
+
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import type { Action, StatField, TeamId, TeamState } from "@/lib/game";
+
+/* Phase Stats: a table that draws itself like a pen stroke when `on` turns
+   true, and un-draws (last pieces first, quicker) when it turns false.
+   Every value is typed by hovering it — same as the grid. */
+
+// Stage layout (1920×1080 px)
+const X0 = 150;
+const X1 = 1770;
+const Y0 = 60;
+const Y1 = 1020;
+const MID = 960;
+const CUT = 28;
+const TITLE_Y = 212;
+const PAD = 70;
+const ROW_LINES = [336, 432, 528, 624];
+const PH_TOP = 668;
+const PH_BOT = 790;
+const TOTAL_LINE = 968;
+
+const halfX = (t: TeamId) => (t === 0 ? [X0 + PAD, MID - PAD] : [MID + PAD, X1 - PAD]);
+
+/** Timing: enter uses `d` / `dur`; exit runs in reverse order and faster. */
+const LAST = 1500;
+const timing = (on: boolean, d: number, dur: number) =>
+  ({
+    "--delay": `${on ? d : Math.round((LAST - d) * 0.16)}ms`,
+    "--dur": `${on ? dur : 320}ms`,
+  }) as CSSProperties;
+
+const ROWS: { label: string; value: StatField; plus: StatField; kind: "time" | "position" | "accuracy" }[] = [
+  { label: "Time", value: "time", plus: "timePlus", kind: "time" },
+  { label: "Position", value: "position", plus: "positionPlus", kind: "position" },
+  { label: "Accuracy", value: "accuracy", plus: "accuracyPlus", kind: "accuracy" },
+];
+const PHASES: StatField[] = ["ph1", "ph2", "ph3"];
+
+interface Props {
+  on: boolean;
+  active: boolean;
+  teams: [TeamState, TeamState];
+  dispatch: (a: Action) => void;
+}
+
+export default function StatsScreen({ on, active, teams, dispatch }: Props) {
+  const hover = useRef<{ team: TeamId; field: StatField } | null>(null);
+  const activeRef = useRef(active);
+  useEffect(() => {
+    activeRef.current = active;
+  }, [active]);
+
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (!activeRef.current || !hover.current || e.ctrlKey || e.metaKey || e.altKey) return;
+      const key = statKey(e);
+      if (!key) return;
+      e.preventDefault();
+      dispatch({ type: "editStat", team: hover.current.team, field: hover.current.field, key });
+    };
+    window.addEventListener("keydown", down);
+    return () => window.removeEventListener("keydown", down);
+  }, [dispatch]);
+
+  const field = (team: TeamId, f: StatField, children: ReactNode, className = "") => (
+    <span
+      onPointerEnter={() => (hover.current = { team, field: f })}
+      onPointerLeave={() => (hover.current = null)}
+      className={`inline-block min-w-[2ch] cursor-text px-1.5 outline-offset-4 hover:outline-1 hover:outline-dashed hover:outline-[var(--pink-dim)] ${className}`}
+    >
+      {children}
+    </span>
+  );
+
+  return (
+    <div className="absolute inset-0" aria-hidden={!on}>
+      {/* ── Lines ── */}
+      <svg className="pointer-events-none absolute inset-0" width={1920} height={1080}>
+        <g fill="none" strokeLinecap="square">
+          {/* outer frame, chamfered like the HUD */}
+          <path
+            pathLength={1}
+            className={`draw ${on ? "on" : ""}`}
+            style={{ ...timing(on, 0, 1100), filter: "drop-shadow(0 0 5px rgba(41,224,143,0.85))" }}
+            stroke="var(--neon)"
+            strokeWidth={2}
+            d={`M ${MID} ${Y0} L ${X1 - CUT} ${Y0} L ${X1} ${Y0 + CUT} L ${X1} ${Y1 - CUT} L ${X1 - CUT} ${Y1} L ${X0 + CUT} ${Y1} L ${X0} ${Y1 - CUT} L ${X0} ${Y0 + CUT} L ${X0 + CUT} ${Y0} Z`}
+          />
+          <Line on={on} d={260} dur={700} x1={X0} y1={TITLE_Y} x2={X1} y2={TITLE_Y} strong />
+          <Line on={on} d={460} dur={760} x1={MID} y1={TITLE_Y} x2={MID} y2={Y1} strong />
+          {/* pink accent on the centre divider */}
+          <Line on={on} d={900} dur={420} x1={MID} y1={540} x2={MID} y2={640} pink />
+
+          {([0, 1] as TeamId[]).map((t) => {
+            const [a, b] = halfX(t);
+            const third = (b - a) / 3;
+            const o = t * 60;
+            return (
+              <g key={t}>
+                {ROW_LINES.map((y, i) => (
+                  <Line key={y} on={on} d={640 + i * 70 + o} dur={480} x1={a} y1={y} x2={b} y2={y} />
+                ))}
+                {/* phase score box */}
+                <path
+                  pathLength={1}
+                  className={`draw ${on ? "on" : ""}`}
+                  style={timing(on, 940 + o, 620)}
+                  stroke="var(--neon)"
+                  strokeWidth={1.6}
+                  d={`M ${a} ${PH_TOP} L ${b} ${PH_TOP} L ${b} ${PH_BOT} L ${a} ${PH_BOT} Z`}
+                />
+                <Line on={on} d={1160 + o} dur={260} x1={a + third} y1={PH_TOP} x2={a + third} y2={PH_BOT} strong />
+                <Line on={on} d={1220 + o} dur={260} x1={a + 2 * third} y1={PH_TOP} x2={a + 2 * third} y2={PH_BOT} strong />
+                <Line on={on} d={1320 + o} dur={420} x1={(a + b) / 2 - 110} y1={TOTAL_LINE} x2={(a + b) / 2 + 110} y2={TOTAL_LINE} pink />
+              </g>
+            );
+          })}
+        </g>
+      </svg>
+
+      {/* ── Title ── */}
+      <Reveal on={on} d={320} className="absolute left-0 right-0 text-center" style={{ top: Y0 + 26 }}>
+        <div className="text-[15px] font-semibold uppercase tracking-[0.55em] text-[var(--text-dim)]">
+          TRSYP 3.0 · Polygame
+        </div>
+        <h1 className="neon-text mt-1 font-[family-name:var(--font-display)] text-[68px] uppercase leading-none tracking-[0.22em]">
+          Phase Stats
+        </h1>
+      </Reveal>
+
+      {/* ── Each team ── */}
+      {([0, 1] as TeamId[]).map((t) => {
+        const [a, b] = halfX(t);
+        const w = b - a;
+        const st = teams[t].stats;
+        const o = t * 60;
+        const total = PHASES.reduce((sum, f) => sum + (parseFloat(st[f]) || 0), 0);
+        return (
+          <div key={t}>
+            {/* team name */}
+            <div className="absolute text-center" style={{ left: a, width: w, top: TITLE_Y + 26 }}>
+              <h2
+                className={`glitch neon-text reveal ${on ? "on" : ""} font-[family-name:var(--font-display)] text-[46px] uppercase leading-none tracking-[0.14em]`}
+                style={timing(on, 700 + o, 420)}
+              >
+                <span className="mr-4 inline-block h-2.5 w-2.5 -translate-y-2 rotate-45 bg-[var(--pink)] shadow-[0_0_8px_var(--pink)]" />
+                {teams[t].name}
+                <span className="ml-4 inline-block h-2.5 w-2.5 -translate-y-2 rotate-45 bg-[var(--pink)] shadow-[0_0_8px_var(--pink)]" />
+              </h2>
+            </div>
+
+            {/* time / position / accuracy */}
+            {ROWS.map((r, i) => {
+              const top = ROW_LINES[i];
+              const h = ROW_LINES[i + 1] - top;
+              return (
+                <Reveal
+                  key={r.label}
+                  on={on}
+                  d={760 + i * 80 + o}
+                  className="absolute flex items-center"
+                  style={{ left: a, width: w, top, height: h }}
+                >
+                  <span className="flex w-[34%] items-center gap-3 pl-2 text-[20px] font-semibold uppercase tracking-[0.3em] text-[var(--text-dim)]">
+                    <span className="h-1.5 w-1.5 rotate-45 bg-[var(--neon)]" />
+                    {r.label}
+                  </span>
+                  <span className="digits w-[38%] text-center text-[48px] leading-none text-[var(--text)]">
+                    {field(t, r.value, <Value raw={st[r.value]} kind={r.kind} on={on} delay={900 + i * 80 + o} />)}
+                  </span>
+                  <span className="digits w-[28%] pr-2 text-right text-[40px] leading-none">
+                    {field(t, r.plus, <Plus raw={st[r.plus]} />)}
+                  </span>
+                </Reveal>
+              );
+            })}
+
+            {/* phase scores */}
+            {PHASES.map((f, i) => (
+              <Reveal
+                key={f}
+                on={on}
+                d={1180 + i * 70 + o}
+                className="absolute flex flex-col items-center justify-center"
+                style={{ left: a + (w / 3) * i, width: w / 3, top: PH_TOP, height: PH_BOT - PH_TOP }}
+              >
+                <span className="text-[15px] font-semibold uppercase tracking-[0.4em] text-[var(--text-dim)]">
+                  Phase {i + 1}
+                </span>
+                <span className="digits mt-1 text-[50px] leading-none text-[var(--text)]">
+                  {field(t, f, <Value raw={st[f]} kind="number" on={on} delay={1250 + i * 70 + o} />)}
+                </span>
+              </Reveal>
+            ))}
+
+            {/* total */}
+            <Reveal
+              on={on}
+              d={1330 + o}
+              className="absolute flex flex-col items-center"
+              style={{ left: a, width: w, top: PH_BOT + 34 }}
+            >
+              <span className="text-[17px] font-semibold uppercase tracking-[0.5em] text-[var(--text-dim)]">
+                Total score
+              </span>
+              <span className="digits pink-text mt-1 text-[96px] leading-none">
+                <CountUp value={total} on={on} delay={1400 + o} />
+              </span>
+            </Reveal>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ─── pieces ─────────────────────────────────────────────────────────── */
+
+function Line({
+  on, d, dur, x1, y1, x2, y2, strong, pink,
+}: { on: boolean; d: number; dur: number; x1: number; y1: number; x2: number; y2: number; strong?: boolean; pink?: boolean }) {
+  return (
+    <path
+      pathLength={1}
+      className={`draw ${on ? "on" : ""}`}
+      style={{
+        ...timing(on, d, dur),
+        filter: pink ? "drop-shadow(0 0 6px var(--pink))" : strong ? "drop-shadow(0 0 4px rgba(41,224,143,0.7))" : undefined,
+      }}
+      stroke={pink ? "var(--pink)" : strong ? "var(--neon)" : "var(--neon-dim)"}
+      strokeWidth={pink ? 3 : strong ? 1.6 : 1.2}
+      d={`M ${x1} ${y1} L ${x2} ${y2}`}
+    />
+  );
+}
+
+function Reveal({
+  on, d, className, style, children,
+}: { on: boolean; d: number; className?: string; style?: CSSProperties; children: ReactNode }) {
+  return (
+    <div className={`reveal ${on ? "on" : ""} ${className ?? ""}`} style={{ ...style, ...timing(on, d, 520) }}>
+      {children}
+    </div>
+  );
+}
+
+const EMPTY = <span className="text-[var(--neon-dim)]">—</span>;
+const NUMERIC = /^-?\d+(\.\d+)?$/;
+
+function Value({ raw, kind, on, delay }: { raw: string; kind: "time" | "position" | "accuracy" | "number"; on: boolean; delay: number }) {
+  if (!raw) return EMPTY;
+  if (kind === "time" || !NUMERIC.test(raw)) return <>{raw}</>;
+  const n = parseFloat(raw);
+  if (kind === "position")
+    return (
+      <>
+        <CountUp value={n} on={on} delay={delay} />
+        <sup className="ml-0.5 text-[0.45em] uppercase">{ordinal(n)}</sup>
+      </>
+    );
+  return (
+    <>
+      <CountUp value={n} on={on} delay={delay} decimals={raw.split(".")[1]?.length ?? 0} />
+      {kind === "accuracy" && <span className="text-[0.6em]">%</span>}
+    </>
+  );
+}
+
+function Plus({ raw }: { raw: string }) {
+  if (!raw) return <span className="text-[var(--neon-dim)]">+—</span>;
+  const neg = raw.startsWith("-");
+  return <span className={neg ? "text-[var(--cell-red)]" : "neon-text"}>{neg ? raw : `+${raw}`}</span>;
+}
+
+const ordinal = (n: number) => {
+  const v = Math.abs(Math.round(n)) % 100;
+  if (v >= 11 && v <= 13) return "th";
+  return ["th", "st", "nd", "rd"][v % 10] ?? "th";
+};
+
+/** Counts up 0 → value each time the screen draws in; edits afterwards show instantly. */
+function CountUp({ value, on, delay, decimals = 0 }: { value: number; on: boolean; delay: number; decimals?: number }) {
+  const [shown, setShown] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!on) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    let raf = 0;
+    const start = performance.now() + delay;
+    const tick = (now: number) => {
+      const p = Math.min(1, Math.max(0, (now - start) / 800));
+      const eased = 1 - Math.pow(1 - p, 3);
+      setShown(p >= 1 ? null : value * eased);
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+    // only replay when the screen draws in, not on every edit
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [on]);
+
+  const v = shown ?? value;
+  return <>{decimals ? v.toFixed(decimals) : Math.round(v)}</>;
+}
+
+/** Keys accepted while hovering a value. Digits by physical key (AZERTY-safe). */
+function statKey(e: KeyboardEvent): string | null {
+  const digit = /^(Digit|Numpad)([0-9])$/.exec(e.code)?.[2];
+  if (digit) return digit;
+  if (e.key === "Backspace" || e.key === "Delete") return e.key;
+  if (e.code === "NumpadDecimal") return ".";
+  if (e.code === "NumpadSubtract") return "-";
+  if ([":", ".", "%", "-"].includes(e.key)) return e.key;
+  return null;
+}
