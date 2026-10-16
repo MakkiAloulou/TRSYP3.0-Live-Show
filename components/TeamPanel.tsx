@@ -13,8 +13,8 @@ interface Props {
   dispatch: (a: Action) => void;
   /** false while another screen is showing, so typing can't edit this grid */
   active: boolean;
-  /** Polygame shows shapes + grid; Garden shows the chances counter */
-  variant?: "polygame" | "garden";
+  /** Polygame shows shapes + grid; Garden shows the chances counter; Mine shows nothing there */
+  variant?: "polygame" | "garden" | "mine";
   /** Score carried in from earlier games (added to the current total) */
   carried?: number;
 }
@@ -66,7 +66,9 @@ export default function TeamPanel({ id, team, dispatch, active, variant = "polyg
       </HudFrame>
 
       {/* Polygame: shapes board (left) + 5x5 grid (right) · Garden: chances left */}
-      {variant === "garden" ? (
+      {variant === "mine" ? (
+        <div className="h-[290px] w-full shrink-0" aria-hidden />
+      ) : variant === "garden" ? (
         <Chances
           value={team.chances}
           onChange={(delta) => {
@@ -132,7 +134,7 @@ export default function TeamPanel({ id, team, dispatch, active, variant = "polyg
             <span className="digits pink-text text-[58px] leading-none" aria-live="polite">
               {carried + team.points}
             </span>
-            {variant === "garden" && (
+            {variant !== "polygame" && (
               <span className="digits mt-1 text-[13px] tracking-[0.2em] text-[var(--text-dim)]">
                 {carried} carried + {team.points}
               </span>

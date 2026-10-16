@@ -521,7 +521,7 @@ export default function PolygameScreen() {
               team={state.teams[0]}
               dispatch={dispatch}
               active={!listOpen && view === "game"}
-              variant={state.game === "garden" ? "garden" : "polygame"}
+              variant={state.game === "garden" ? "garden" : state.game === "game3" ? "mine" : "polygame"}
               carried={carry[0]}
             />
             <div
@@ -535,7 +535,7 @@ export default function PolygameScreen() {
               team={state.teams[1]}
               dispatch={dispatch}
               active={!listOpen && view === "game"}
-              variant={state.game === "garden" ? "garden" : "polygame"}
+              variant={state.game === "garden" ? "garden" : state.game === "game3" ? "mine" : "polygame"}
               carried={carry[1]}
             />
           </div>

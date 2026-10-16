@@ -4,7 +4,7 @@ Live match screens for the TRSYP 3.0 robotics competition. Built screen by scree
 
 ## Page −1 — Games
 
-The app opens on the three games: **01 Polygame**, **02 Garden**, **03** (coming soon). Click a game to zoom into its match list. The same pairs of teams play every game in order, and **scores carry over**: a team starts Garden with its Polygame total. `Z` always goes up one level (match → match list → games).
+The app opens on the three games: **01 Polygame**, **02 Garden**, **03 Mine**. Click a game to zoom into its match list. The same pairs of teams play every game in order, and **scores carry over**: a team starts Garden with its Polygame total. `Z` always goes up one level (match → match list → games).
 
 ## Screen 0 — Matches
 
@@ -47,6 +47,10 @@ Fix things by hand: hover a team's points and type; double-click a name to renam
 Same screen as Polygame, but under each camera there's a big **CHANCES LEFT** number instead of the shapes and grid. Left-click it (or `E` team 1 / `I` team 2) to use a chance, right-click (or `D` / `J`) to give one back. At 0 it turns red and **OUT** flashes. `Shift+1–9` sets the starting chances for every Garden match. The current total starts at the team's Polygame total.
 
 Flow: Garden → **Game Stats** (no Phase Stats; cumulative scores and the dominant team) → **Leaderboard** (adds only the points earned in Garden).
+
+## Game 3 — Mine
+
+Same screen with only the cameras and the timer / current total (empty space below the cameras). The current total starts at Polygame + Garden. Flow: Mine → **Game Stats** (cumulative, dominant team) → **Leaderboard** (adds only the Mine points).
 
 ## Sound
 

@@ -62,7 +62,7 @@ export type GameKind = (typeof GAMES)[number];
 export const GAME_INFO: Record<GameKind, { num: number; title: string; ready: boolean }> = {
   polygame: { num: 1, title: "Polygame", ready: true },
   garden: { num: 2, title: "Garden", ready: true },
-  game3: { num: 3, title: "Game 3", ready: false },
+  game3: { num: 3, title: "Mine", ready: true },
 };
 
 /** One game played by one pair: both teams' boards/stats and its league bookkeeping */
