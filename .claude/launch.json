@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "polygame",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "cd /d C:\\Users\\LENOVO\\neo-defi\\trsyp-3.0-game && npm run dev -- -p 3100"],
+      "port": 3100
+    }
+  ]
+}

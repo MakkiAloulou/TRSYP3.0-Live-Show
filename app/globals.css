@@ -1,0 +1,86 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #020705;
+  --panel: #04110c;
+  --neon: #29e08f;
+  --neon-dim: #0f5c3b;
+  --neon-faint: rgba(41, 224, 143, 0.12);
+  --pink: #ff4fd8;
+  --pink-dim: rgba(255, 79, 216, 0.35);
+  --text: #e6fff3;
+  --text-dim: #7fb79c;
+
+  --cell-white: #f3f6f4;
+  --cell-red: #f2556b;
+  --cell-blue: #4d6bff;
+  --shape-grey: #6c7370;
+}
+
+@theme inline {
+  --color-neon: var(--neon);
+  --color-pink: var(--pink);
+  --font-body: var(--font-body);
+  --font-display: var(--font-display);
+  --font-digits: var(--font-digits);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body), sans-serif;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+.neon-text {
+  color: var(--neon);
+  text-shadow: 0 0 8px rgba(41, 224, 143, 0.65), 0 0 24px rgba(41, 224, 143, 0.35);
+}
+
+.pink-text {
+  color: var(--pink);
+  text-shadow: 0 0 8px rgba(255, 79, 216, 0.6);
+}
+
+.digits {
+  font-family: var(--font-digits), monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Comet of light travelling around a HUD frame */
+@keyframes trace {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.tracer {
+  animation: trace var(--trace-dur, 7s) linear infinite;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+.blink {
+  animation: blink 1.2s steps(2, start) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tracer,
+  .blink {
+    animation: none;
+  }
+}
