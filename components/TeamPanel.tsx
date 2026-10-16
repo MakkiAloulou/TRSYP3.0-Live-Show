@@ -76,6 +76,7 @@ export default function TeamPanel({ id, team, dispatch }: Props) {
                 grid={team.grid}
                 onCell={(i, half) => dispatch({ type: "cycleCell", team: id, index: i, half })}
                 onHalf={(i, half) => dispatch({ type: "cycleHalf", team: id, index: i, half })}
+                onKey={(i, half, key) => dispatch({ type: "editLabel", team: id, index: i, half, key })}
               />
             </div>
           </div>

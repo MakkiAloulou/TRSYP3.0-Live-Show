@@ -8,7 +8,7 @@ import TeamPanel from "./TeamPanel";
 
 const STAGE_W = 1920;
 const STAGE_H = 1080;
-const STORAGE_KEY = "trsyp3-polygame-v2";
+const STORAGE_KEY = "trsyp3-polygame-v3";
 
 /* Keyboard map (by physical key, so layout/caps lock don't matter).
    Shift + points key = ±5. */
@@ -38,7 +38,7 @@ export default function PolygameScreen() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       const saved = raw ? (JSON.parse(raw) as GameState) : null;
-      if (saved && Array.isArray(saved.teams?.[0]?.grid?.[0])) dispatch({ type: "load", state: saved });
+      if (saved && Array.isArray(saved.teams?.[0]?.grid?.[0]?.colors)) dispatch({ type: "load", state: saved });
     } catch {}
   }, []);
 
@@ -180,6 +180,7 @@ function HelpOverlay({ onClose }: { onClose: () => void }) {
             <li><Kbd>Shift</Kbd>+<Kbd>X</Kbd> twice — reset everything</li>
             <li>Shapes: left click removes / brings back · right click greys / restores</li>
             <li>Grid: left click colours the whole square · right click colours one triangle (white → red → blue)</li>
+            <li>Grid numbers: hover a square / triangle and type digits · <Kbd>Backspace</Kbd> deletes · <Kbd>Del</Kbd> clears</li>
             <li>Double-click a team name to rename · <Kbd>H</Kbd> toggles this panel</li>
           </ul>
         </div>

@@ -2,8 +2,16 @@
 
 export type ShapeState = "normal" | "grey" | "removed";
 export type GridColor = 0 | 1 | 2; // 0 white, 1 red, 2 blue
-/** A grid square split on its "\" diagonal: [top-right triangle, bottom-left triangle] */
-export type GridCell = [GridColor, GridColor];
+/** A grid square split on its "\" diagonal into [top-right, bottom-left] triangles.
+    `full` = coloured as one square (no diagonal shown); otherwise the halves are separate. */
+export interface GridCell {
+  colors: [GridColor, GridColor];
+  full: boolean;
+  /** Number typed on the whole square (shown when full) */
+  label: string;
+  /** Numbers typed on each triangle (shown when split) */
+  halfLabels: [string, string];
+}
 export type TeamId = 0 | 1;
 
 export interface TimerState {
@@ -28,6 +36,7 @@ export type Action =
   | { type: "setShape"; team: TeamId; id: string; state: ShapeState }
   | { type: "cycleHalf"; team: TeamId; index: number; half: 0 | 1 }
   | { type: "cycleCell"; team: TeamId; index: number; half: 0 | 1 }
+  | { type: "editLabel"; team: TeamId; index: number; half: 0 | 1; key: string }
   | { type: "toggleTimer"; team: TeamId; now: number }
   | { type: "toggleBoth"; now: number }
   | { type: "resetTimer"; team: TeamId }
@@ -104,7 +113,7 @@ const freshTimer = (): TimerState => ({ running: false, startedAt: null, accumul
 const freshTeam = (name: string): TeamState => ({
   name,
   shapes: Object.fromEntries(SHAPES.map((s) => [s.id, "normal" as ShapeState])),
-  grid: Array.from({ length: 25 }, (): GridCell => [0, 0]),
+  grid: Array.from({ length: 25 }, (): GridCell => ({ colors: [0, 0], full: false, label: "", halfLabels: ["", ""] })),
   timer: freshTimer(),
   points: 0,
 });
@@ -129,25 +138,40 @@ const updateTeam = (s: GameState, team: TeamId, fn: (t: TeamState) => TeamState)
   return { teams };
 };
 
+const updateCell = (s: GameState, team: TeamId, index: number, fn: (c: GridCell) => GridCell) =>
+  updateTeam(s, team, (t) => {
+    const grid = [...t.grid];
+    grid[index] = fn(grid[index]);
+    return { ...t, grid };
+  });
+
 export function reducer(s: GameState, a: Action): GameState {
   switch (a.type) {
     case "setShape":
       return updateTeam(s, a.team, (t) => ({ ...t, shapes: { ...t.shapes, [a.id]: a.state } }));
     case "cycleHalf":
-      return updateTeam(s, a.team, (t) => {
-        const grid = [...t.grid];
-        const cell: GridCell = [...grid[a.index]];
-        cell[a.half] = nextColor(cell[a.half]);
-        grid[a.index] = cell;
-        return { ...t, grid };
+      // One triangle: the square becomes "split" and keeps its diagonal
+      return updateCell(s, a.team, a.index, (c) => {
+        const colors: GridCell["colors"] = [...c.colors];
+        colors[a.half] = nextColor(colors[a.half]);
+        return { ...c, colors, full: false };
       });
     case "cycleCell":
-      // Whole square: both halves move to the next colour of the half that was clicked
-      return updateTeam(s, a.team, (t) => {
-        const grid = [...t.grid];
-        const c = nextColor(grid[a.index][a.half]);
-        grid[a.index] = [c, c];
-        return { ...t, grid };
+      // Whole square: both halves move to the next colour of the half that was clicked.
+      // Back to white → it's a plain square again (diagonal hint shows).
+      return updateCell(s, a.team, a.index, (c) => {
+        const next = nextColor(c.colors[a.half]);
+        return { ...c, colors: [next, next], full: next !== 0 };
+      });
+    case "editLabel":
+      // Typed while hovering: the whole square's number if it's full, else the hovered triangle's
+      return updateCell(s, a.team, a.index, (c) => {
+        const edit = (v: string) =>
+          a.key === "Backspace" ? v.slice(0, -1) : a.key === "Delete" ? "" : (v + a.key).slice(-3);
+        if (c.full) return { ...c, label: edit(c.label) };
+        const halfLabels: GridCell["halfLabels"] = [...c.halfLabels];
+        halfLabels[a.half] = edit(halfLabels[a.half]);
+        return { ...c, halfLabels };
       });
     case "toggleTimer":
       return updateTeam(s, a.team, (t) => ({ ...t, timer: toggle(t.timer, a.now) }));
