@@ -6,6 +6,7 @@ import HudFrame from "./HudFrame";
 import ParticleField from "./ParticleField";
 import ScanBar, { SCAN_W } from "./ScanBar";
 import FinalScreen from "./FinalScreen";
+import LeaderboardScreen from "./LeaderboardScreen";
 import StatsScreen from "./StatsScreen";
 import TeamPanel from "./TeamPanel";
 
@@ -26,26 +27,36 @@ const KEYS = {
   k: { type: "points", team: 1, delta: -1 },
 } as const;
 
-const VIEWS = ["game", "stats", "final"] as const;
+const VIEWS = ["game", "stats", "final", "board"] as const;
 
 const WIPE_MS = 820;
 const easeInOut = (p: number) => (p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2);
 
-/** rAF tween 0→1; resolves when done (instantly with reduced motion). */
+/** rAF tween 0→1; resolves when done (instantly with reduced motion). A timer
+    guarantees it finishes on time even if the browser throttles frames. */
 const tween = (ms: number, frame: (p: number) => void) =>
   new Promise<void>((done) => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       frame(1);
       return done();
     }
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      frame(1);
+      done();
+    };
     const t0 = performance.now();
     const step = (now: number) => {
+      if (finished) return;
       const p = Math.min(1, (now - t0) / ms);
+      if (p >= 1) return finish();
       frame(p);
-      if (p < 1) requestAnimationFrame(step);
-      else done();
+      requestAnimationFrame(step);
     };
     requestAnimationFrame(step);
+    setTimeout(finish, ms + 60);
   });
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -95,6 +106,7 @@ export default function PolygameScreen() {
     });
     setDrawnAt(i, false); // fully hidden now; reset so it draws in fresh on return
     busy.current = false;
+    runQueued();
   };
 
   const goPrev = async () => {
@@ -109,6 +121,15 @@ export default function PolygameScreen() {
     viewRef.current = i - 1;
     setViewIdx(i - 1);
     busy.current = false;
+    runQueued();
+  };
+  // A press during a transition is remembered and played right after it
+  const queued = useRef<"next" | "prev" | null>(null);
+  const runQueued = () => {
+    const q = queued.current;
+    queued.current = null;
+    if (q === "next") void goNext();
+    else if (q === "prev") void goPrev();
   };
   const nav = useRef({ goNext, goPrev });
   useEffect(() => {
@@ -150,12 +171,14 @@ export default function PolygameScreen() {
 
       if (e.key === "ArrowRight") {
         e.preventDefault();
-        nav.current.goNext();
+        if (busy.current) queued.current = "next";
+        else nav.current.goNext();
         return;
       }
       if (e.key === "ArrowLeft") {
         e.preventDefault();
-        nav.current.goPrev();
+        if (busy.current) queued.current = "prev";
+        else nav.current.goPrev();
         return;
       }
       if (e.key.toLowerCase() === "h") {
@@ -206,7 +229,12 @@ export default function PolygameScreen() {
       >
         <ParticleField />
 
-        {/* Bottom of the stack: Game Stats */}
+        {/* Bottom of the stack: Leaderboard */}
+        <div ref={(el) => void (layerRefs.current[3] = el)} inert={view !== "board"} className="absolute inset-0 z-[5]">
+          <LeaderboardScreen on={drawn[3]} active={view === "board"} state={state} dispatch={dispatch} />
+        </div>
+
+        {/* Game Stats */}
         <div ref={(el) => void (layerRefs.current[2] = el)} inert={view !== "final"} className="absolute inset-0 z-10">
           <FinalScreen on={drawn[2]} teams={state.teams} />
         </div>
@@ -293,9 +321,10 @@ function HelpOverlay({ onClose }: { onClose: () => void }) {
           </table>
           <ul className="mt-6 space-y-1.5 text-base text-[var(--text-dim)]">
             <li><Kbd>Space</Kbd> start / pause both timers</li>
-            <li><Kbd>→</Kbd> next screen (Polygame → Phase Stats → Game Stats) · <Kbd>←</Kbd> back</li>
+            <li><Kbd>→</Kbd> next screen (Polygame → Phase Stats → Game Stats → Leaderboard) · <Kbd>←</Kbd> back</li>
+            <li>Leaderboard: hover points and type · double-click a name to rename</li>
             <li>Phase Stats: hover any value and type (digits : . % -) · <Kbd>Backspace</Kbd> / <Kbd>Del</Kbd></li>
-            <li><Kbd>Shift</Kbd>+<Kbd>X</Kbd> twice — reset everything</li>
+            <li><Kbd>Shift</Kbd>+<Kbd>X</Kbd> twice — new match (clears boards, timers, stats; keeps the leaderboard)</li>
             <li>Shapes: left click removes / brings back · right click greys / restores</li>
             <li>Grid: left click colours the whole square · right click colours one triangle (white → red → blue)</li>
             <li>Grid numbers: hover a square / triangle and type digits · <Kbd>Backspace</Kbd> deletes · <Kbd>Del</Kbd> clears</li>

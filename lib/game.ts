@@ -43,8 +43,21 @@ export interface TeamState {
   stats: TeamStats;
 }
 
+/** One of the 9 teams on the overall leaderboard */
+export interface LeagueTeam {
+  id: string;
+  name: string;
+  points: number;
+  played: number;
+}
+
 export interface GameState {
+  /** The two teams playing the current match */
   teams: [TeamState, TeamState];
+  /** Overall standings, always kept sorted (points desc, previous order breaks ties) */
+  league: LeagueTeam[];
+  /** True once this match's totals have been added to the league */
+  matchCommitted: boolean;
 }
 
 export type Action =
@@ -59,6 +72,9 @@ export type Action =
   | { type: "addPoints"; team: TeamId; delta: number }
   | { type: "rename"; team: TeamId; name: string }
   | { type: "resetAll" }
+  | { type: "commitMatch" }
+  | { type: "renameLeague"; id: string; name: string }
+  | { type: "editLeaguePoints"; id: string; key: string }
   | { type: "load"; state: GameState };
 
 /* ─── Shapes geometry (flat top view) ─────────────────────────────────
@@ -148,6 +164,8 @@ const freshTeam = (name: string): TeamState => ({
 
 /** Fill in anything a save from an older version is missing. */
 export const normalizeState = (s: GameState): GameState => ({
+  league: Array.isArray(s.league) && s.league.length ? s.league : freshLeague(),
+  matchCommitted: !!s.matchCommitted,
   teams: s.teams.map((t) => {
     const base = freshTeam(t.name);
     return { ...base, ...t, grid: (t.grid ?? base.grid).map(toCell), stats: { ...base.stats, ...t.stats } };
@@ -156,7 +174,33 @@ export const normalizeState = (s: GameState): GameState => ({
 
 export const initialState = (): GameState => ({
   teams: [freshTeam("CUBOT"), freshTeam("TEST 2")],
+  league: freshLeague(),
+  matchCommitted: false,
 });
+
+function freshLeague(): LeagueTeam[] {
+  return ["CUBOT", "TEST 2", ...Array.from({ length: 7 }, (_, i) => `TEAM ${i + 3}`)].map((name, i) => ({
+    id: `t${i + 1}`,
+    name,
+    points: 0,
+    played: 0,
+  }));
+}
+
+/** Stable sort: more points first; equal points keep their previous order. */
+const sortLeague = (l: LeagueTeam[]) => l.map((t, i) => ({ t, i })).sort((a, b) => b.t.points - a.t.points || a.i - b.i).map((x) => x.t);
+
+const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+
+/** Points each league team would gain from the current match (by matching team names). */
+export const matchGains = (s: GameState): Record<string, number> => {
+  const gains: Record<string, number> = {};
+  for (const t of s.teams) {
+    const lt = s.league.find((l) => sameName(l.name, t.name));
+    if (lt) gains[lt.id] = (gains[lt.id] ?? 0) + teamTotal(t.stats);
+  }
+  return gains;
+};
 
 /** Accepts any older saved / in-memory cell shape and returns a valid GridCell. */
 export function toCell(raw: unknown): GridCell {
@@ -183,7 +227,7 @@ const toggle = (t: TimerState, now: number): TimerState =>
 const updateTeam = (s: GameState, team: TeamId, fn: (t: TeamState) => TeamState): GameState => {
   const teams = [...s.teams] as GameState["teams"];
   teams[team] = fn(teams[team]);
-  return { teams };
+  return { ...s, teams };
 };
 
 const updateCell = (s: GameState, team: TeamId, index: number, fn: (c: GridCell) => GridCell) =>
@@ -234,6 +278,7 @@ export function reducer(s: GameState, a: Action): GameState {
       // If either is running, pause both; otherwise start both.
       const anyRunning = s.teams.some((t) => t.timer.running);
       return {
+        ...s,
         teams: s.teams.map((t) =>
           t.timer.running === anyRunning ? { ...t, timer: toggle(t.timer, a.now) } : t,
         ) as GameState["teams"],
@@ -246,8 +291,33 @@ export function reducer(s: GameState, a: Action): GameState {
     case "rename":
       return updateTeam(s, a.team, (t) => ({ ...t, name: a.name }));
     case "resetAll":
+      // New match: clear boards, timers, points and stats; keep the league
       return {
+        ...s,
         teams: s.teams.map((t) => ({ ...freshTeam(t.name) })) as GameState["teams"],
+        matchCommitted: false,
+      };
+    case "commitMatch": {
+      if (s.matchCommitted) return s;
+      const gains = matchGains(s);
+      const league = s.league.map((l) =>
+        l.id in gains ? { ...l, points: l.points + gains[l.id], played: l.played + 1 } : l,
+      );
+      return { ...s, league: sortLeague(league), matchCommitted: true };
+    }
+    case "renameLeague":
+      return { ...s, league: s.league.map((l) => (l.id === a.id ? { ...l, name: a.name } : l)) };
+    case "editLeaguePoints":
+      return {
+        ...s,
+        league: sortLeague(
+          s.league.map((l) => {
+            if (l.id !== a.id) return l;
+            const cur = String(l.points);
+            const next = a.key === "Backspace" ? cur.slice(0, -1) : a.key === "Delete" ? "" : (cur === "0" ? "" : cur) + a.key;
+            return { ...l, points: parseInt(next.slice(0, 5), 10) || 0 };
+          }),
+        ),
       };
     case "load":
       return normalizeState(a.state);

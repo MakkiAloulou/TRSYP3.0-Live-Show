@@ -18,7 +18,8 @@ const TITLE_Y = 212;
 const SPLIT_Y = 640;
 const PAD = 70;
 
-const REVEAL_AFTER_MS = 6000;
+// scores start counting at ~950ms for 1500ms; reveal 2s after they land
+const REVEAL_AFTER_MS = 950 + 1500 + 2000;
 // reveal timeline (ms after it starts)
 const T_LINE = 0;
 const T_CAPTION = 250;

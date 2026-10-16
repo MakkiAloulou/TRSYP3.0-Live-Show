@@ -21,7 +21,13 @@ Each team shows Time (compared against a fixed 5:00 — green "<" under, red ">"
 
 ## Screen 3 — Game Stats
 
-Press `→` again from Phase Stats. Shows each team's **total score** (taken from Phase Stats). 6 seconds after the screen appears, the reveal plays: a line sweeps across, "THE DOMINANT TEAM IS" decodes, and the leading team's name slams in with a shockwave, particle burst and screen shake. The leading score pulses and the other team dims. A tie shows "IT'S A DRAW". `←` goes back one screen.
+Press `→` again from Phase Stats. Shows each team's **total score** (taken from Phase Stats). 2 seconds after the scores finish counting, the reveal plays: a line sweeps across, "THE DOMINANT TEAM IS" decodes, and the leading team's name slams in with a shockwave, particle burst and screen shake. The leading score pulses and the other team dims. A tie shows "IT'S A DRAW". `←` goes back one screen.
+
+## Screen 4 — Leaderboard
+
+Press `→` from Game Stats. All 9 teams (placeholders CUBOT, TEST 2, TEAM 3–9 for now), ranked by points, with games played. The first time it opens after a match, it shows the old standings, then 3 s later each playing team's Game Stats total is added: points count up, a `+N` badge pops, rows slide to their new places and ▲/▼ show how far each team moved. Teams are matched by name to the two Polygame teams. Each match is added only once; equal points keep the previous order.
+
+Fix things by hand: hover a team's points and type; double-click a name to rename. `Shift+X` twice starts a new match (clears boards, timers, points and stats, keeps the leaderboard).
 
 ### Keyboard
 
@@ -32,9 +38,9 @@ Press `→` again from Phase Stats. Shows each team's **total score** (taken fro
 | Points +1 (Shift = +5) | `W` | `O` |
 | Points −1 (Shift = −5) | `S` | `K` |
 
-- `→` / `←` — next / previous screen (Polygame → Phase Stats → Game Stats)
+- `→` / `←` — next / previous screen (Polygame → Phase Stats → Game Stats → Leaderboard)
 - `Space` — start / pause both timers (Polygame screen)
-- `Shift+X` twice within 2 s — reset everything
+- `Shift+X` twice within 2 s — new match (keeps the leaderboard)
 - `H` — show / hide the controls panel
 - Double-click a team name to rename it (defaults: CUBOT, TEST 2)
 
