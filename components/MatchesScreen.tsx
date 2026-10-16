@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { matchStatus, teamTotal, type Action, type GameState, type Match } from "@/lib/game";
+import { cumulative, GAME_INFO, slotStatus, type Action, type GameKind, type GameState, type Match } from "@/lib/game";
 import { sfx } from "@/lib/sfx";
 import { DrawPath, framePath, Line, Reveal } from "./Draw";
 import HudFrame from "./HudFrame";
@@ -126,7 +126,7 @@ export default function MatchesScreen({ on, active, state, dispatch, onOpen }: P
 
       <Reveal on={on} d={320} className="absolute left-0 right-0 text-center" style={{ top: Y0 + 26 }}>
         <div className="text-[15px] font-semibold uppercase tracking-[0.55em] text-[var(--text-dim)]">
-          TRSYP 3.0 · Polygame
+          TRSYP 3.0 · Game {String(GAME_INFO[state.game].num).padStart(2, "0")} · {GAME_INFO[state.game].title}
         </div>
         <h1 className="neon-text mt-1 font-[family-name:var(--font-display)] text-[68px] uppercase leading-none tracking-[0.22em]">
           Matches
@@ -154,6 +154,7 @@ export default function MatchesScreen({ on, active, state, dispatch, onOpen }: P
           >
             <Card
               match={m}
+              game={state.game}
               compact={cardH < 150}
               armed={armed === m.id}
               onEnter={() => (hover.current = m.id)}
@@ -165,7 +166,7 @@ export default function MatchesScreen({ on, active, state, dispatch, onOpen }: P
       })}
 
       <Reveal on={on} d={900} className="absolute left-0 right-0 text-center text-[13px] uppercase tracking-[0.4em] text-[var(--text-dim)] opacity-70" style={{ top: Y1 - 40 }}>
-        N new match · click a match to open · hover + Delete twice to remove · Z back here from any screen
+        N new match · click a match to open · hover + Delete twice to remove · Z back to the games
       </Reveal>
 
       {picking && (
@@ -187,13 +188,23 @@ const STATUS = {
 } as const;
 
 function Card({
-  match, compact, armed, onEnter, onLeave, onOpen,
-}: { match: Match; compact: boolean; armed: boolean; onEnter: () => void; onLeave: () => void; onOpen: (el: HTMLElement) => void }) {
+  match, game, compact, armed, onEnter, onLeave, onOpen,
+}: {
+  match: Match;
+  game: GameKind;
+  compact: boolean;
+  armed: boolean;
+  onEnter: () => void;
+  onLeave: () => void;
+  onOpen: (el: HTMLElement) => void;
+}) {
   const ref = useRef<HTMLButtonElement>(null);
-  const status = matchStatus(match);
-  const [a, b] = match.teams;
-  const ta = teamTotal(a.stats);
-  const tb = teamTotal(b.stats);
+  const slot = match.games[game];
+  const status = slotStatus(slot);
+  const [a, b] = slot.teams;
+  // score so far, carried over from the earlier games
+  const ta = cumulative(match, game, 0);
+  const tb = cumulative(match, game, 1);
   const lead = status === "done" ? (ta === tb ? -1 : ta > tb ? 0 : 1) : -1;
   const nameCls = (i: number) =>
     lead === -1 ? "text-[var(--text)]" : lead === i ? "neon-text" : "text-[var(--text-dim)] opacity-70";

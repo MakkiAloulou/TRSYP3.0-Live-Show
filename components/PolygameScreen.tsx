@@ -1,20 +1,21 @@
 "use client";
 
 import { useEffect, useReducer, useRef, useState } from "react";
-import { initialState, reducer, type GameState } from "@/lib/game";
+import { cumulative, GAME_INFO, initialState, reducer, slotCarry, teamTotal, type GameKind, type GameState } from "@/lib/game";
 import { isMuted, onMuteChange, setMuted, sfx } from "@/lib/sfx";
 import HudFrame from "./HudFrame";
 import ParticleField from "./ParticleField";
 import ScanBar, { SCAN_W } from "./ScanBar";
 import FinalScreen from "./FinalScreen";
 import LeaderboardScreen from "./LeaderboardScreen";
+import GamesScreen from "./GamesScreen";
 import MatchesScreen from "./MatchesScreen";
 import StatsScreen from "./StatsScreen";
 import TeamPanel from "./TeamPanel";
 
 const STAGE_W = 1920;
 const STAGE_H = 1080;
-const STORAGE_KEY = "trsyp3-polygame-v5"; // v5: matches (screen 0)
+const STORAGE_KEY = "trsyp3-polygame-v6"; // v6: games (page −1) + Garden
 
 /* Keyboard map by the letter printed on the key (works on AZERTY and QWERTY;
    caps lock / Shift don't matter). Shift + points key = ±5. */
@@ -30,6 +31,8 @@ const KEYS = {
 } as const;
 
 const VIEWS = ["game", "stats", "final", "board"] as const;
+/** Which screens each game walks through with → (Garden has no Phase Stats). */
+const SEQ: Record<GameKind, number[]> = { polygame: [0, 1, 2, 3], garden: [0, 2, 3], game3: [0, 2, 3] };
 
 const WIPE_MS = 820;
 const easeInOut = (p: number) => (p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2);
@@ -119,10 +122,12 @@ export default function PolygameScreen() {
 
   const goNext = async () => {
     const i = viewRef.current;
-    if (busy.current || i >= VIEWS.length - 1) return;
+    const seq = SEQ[stateRef.current.game];
+    const next = seq[seq.indexOf(i) + 1];
+    if (busy.current || next === undefined) return;
     busy.current = true;
-    viewRef.current = i + 1;
-    setViewIdx(i + 1);
+    viewRef.current = next;
+    setViewIdx(next);
     let started = false;
     sfx.whoosh(WIPE_MS / 1000);
     await tween(WIPE_MS, (p) => {
@@ -130,8 +135,8 @@ export default function PolygameScreen() {
       // start drawing the next screen while the bar is still crossing
       if (!started && p > 0.45) {
         started = true;
-        setDrawnAt(i + 1, true);
-        drawSounds(i + 1);
+        setDrawnAt(next, true);
+        drawSounds(next);
       }
     });
     setDrawnAt(i, false); // fully hidden now; reset so it draws in fresh on return
@@ -141,24 +146,31 @@ export default function PolygameScreen() {
 
   const goPrev = async () => {
     const i = viewRef.current;
-    if (busy.current || i <= 0) return;
+    const seq = SEQ[stateRef.current.game];
+    const prev = seq[seq.indexOf(i) - 1];
+    if (busy.current || prev === undefined) return;
     busy.current = true;
     setDrawnAt(i, false); // the current screen un-draws first
     await wait(420);
-    setDrawnAt(i - 1, true);
+    setDrawnAt(prev, true);
     sfx.whoosh(WIPE_MS / 1000);
-    drawSounds(i - 1);
+    drawSounds(prev);
     // mirrored bar trails to the right of the edge, so run it past 0 to leave the screen
-    await tween(WIPE_MS, (p) => placeWipe(i - 1, (1 - easeInOut(p)) * (STAGE_W + 2 * SCAN_W) - SCAN_W, false));
-    viewRef.current = i - 1;
-    setViewIdx(i - 1);
+    await tween(WIPE_MS, (p) => placeWipe(prev, (1 - easeInOut(p)) * (STAGE_W + 2 * SCAN_W) - SCAN_W, false));
+    viewRef.current = prev;
+    setViewIdx(prev);
     busy.current = false;
     runQueued();
   };
   /* ── Screen 0 (match list) and the zoom in / out of a card ── */
   const [listOpen, setListOpen] = useState(true);
-  const [listOn, setListOn] = useState(true);
+  const [listOn, setListOn] = useState(false);
   const listOpenRef = useRef(true);
+  // page −1 (games) sits above the match list
+  const [gamesOpen, setGamesOpen] = useState(true);
+  const [gamesOn, setGamesOn] = useState(true);
+  const gamesOpenRef = useRef(true);
+  const gamesRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const zoomRef = useRef<HTMLDivElement>(null);
@@ -183,8 +195,8 @@ export default function PolygameScreen() {
   const hideZoom = () => {
     if (zoomRef.current) zoomRef.current.style.display = "none";
   };
-  const placeList = (opacity: number, scale: number, origin: Rect) => {
-    const l = listRef.current;
+  const placeList = (opacity: number, scale: number, origin: Rect, el: HTMLElement | null = listRef.current) => {
+    const l = el;
     if (!l) return;
     l.style.opacity = String(opacity);
     l.style.transformOrigin = `${origin.x + origin.w / 2}px ${origin.y + origin.h / 2}px`;
@@ -193,17 +205,20 @@ export default function PolygameScreen() {
   /** Put the four match screens back to "Polygame showing, nothing else drawn". */
   const resetFlow = () => {
     layerRefs.current.forEach((l) => l && (l.style.clipPath = ""));
+    // games without Phase Stats keep that (empty) layer out of the way of the mouse
+    const stats = layerRefs.current[1];
+    if (stats && !SEQ[stateRef.current.game].includes(1)) stats.style.clipPath = `inset(0 0 0 ${STAGE_W}px)`;
     setDrawn(VIEWS.map((_, i) => i === 0));
     viewRef.current = 0;
     setViewIdx(0);
   };
 
   const openMatch = async (id: string, card: HTMLElement) => {
-    if (busy.current || !listOpenRef.current) return;
+    if (busy.current || !listOpenRef.current || gamesOpenRef.current) return;
     busy.current = true;
     const from = toStage(card);
     const m = stateRef.current.matches.find((x) => x.id === id);
-    setZoomLabel(m ? `${m.teams[0].name}  VS  ${m.teams[1].name}` : "");
+    setZoomLabel(m ? `${m.games[stateRef.current.game].teams[0].name}  VS  ${m.games[stateRef.current.game].teams[1].name}` : "");
     dispatch({ type: "openMatch", id });
     resetFlow();
     sfx.zoomIn();
@@ -230,7 +245,7 @@ export default function PolygameScreen() {
     const card = cur ? listRef.current?.querySelector<HTMLElement>(`[data-match="${cur}"]`) : null;
     const to: Rect = card ? toStage(card) : { x: STAGE_W / 2 - 240, y: STAGE_H / 2 - 90, w: 480, h: 180 };
     const m = stateRef.current.matches.find((x) => x.id === cur);
-    setZoomLabel(m ? `${m.teams[0].name}  VS  ${m.teams[1].name}` : "");
+    setZoomLabel(m ? `${m.games[stateRef.current.game].teams[0].name}  VS  ${m.games[stateRef.current.game].teams[1].name}` : "");
     sfx.zoomOut();
     // cover the current screen, then shrink back into the card
     await tween(200, (p) => placeZoom(FULL, p));
@@ -248,9 +263,57 @@ export default function PolygameScreen() {
     hideZoom();
     busy.current = false;
   };
-  const listNav = useRef({ openMatch, backToList });
+  /** Page −1 → a game's match list (zoom into the game card). */
+  const openGame = async (game: GameKind, card: HTMLElement) => {
+    if (busy.current || !gamesOpenRef.current) return;
+    busy.current = true;
+    const from = toStage(card);
+    setZoomLabel(`Game ${String(GAME_INFO[game].num).padStart(2, "0")} · ${GAME_INFO[game].title}`);
+    dispatch({ type: "selectGame", game });
+    sfx.zoomIn();
+    await tween(ZOOM_MS, (p) => {
+      const q = easeInOut(p);
+      placeZoom({ x: lerp(from.x, 0, q), y: lerp(from.y, 0, q), w: lerp(from.w, STAGE_W, q), h: lerp(from.h, STAGE_H, q) }, 1);
+      placeList(1 - q, 1 + 0.25 * q, from, gamesRef.current);
+    });
+    gamesOpenRef.current = false;
+    setGamesOpen(false);
+    setGamesOn(false);
+    setListOn(true);
+    sfx.scribble(1.2, 0.05);
+    await tween(260, (p) => placeZoom(FULL, 1 - p));
+    hideZoom();
+    busy.current = false;
+  };
+
+  /** Match list → page −1 (shrink back into the game card). */
+  const backToGames = async () => {
+    if (busy.current || gamesOpenRef.current || !listOpenRef.current) return;
+    busy.current = true;
+    const g = stateRef.current.game;
+    const card = gamesRef.current?.querySelector<HTMLElement>(`[data-game="${g}"]`);
+    const to: Rect = card ? toStage(card) : { x: STAGE_W / 2 - 235, y: 300, w: 470, h: 560 };
+    setZoomLabel(`Game ${String(GAME_INFO[g].num).padStart(2, "0")} · ${GAME_INFO[g].title}`);
+    sfx.zoomOut();
+    await tween(200, (p) => placeZoom(FULL, p));
+    gamesOpenRef.current = true;
+    setGamesOpen(true);
+    setGamesOn(true);
+    setListOn(false);
+    await tween(ZOOM_MS, (p) => {
+      const q = easeInOut(p);
+      placeZoom({ x: lerp(0, to.x, q), y: lerp(0, to.y, q), w: lerp(STAGE_W, to.w, q), h: lerp(STAGE_H, to.h, q) }, 1);
+      placeList(q, 1.25 - 0.25 * q, to, gamesRef.current);
+    });
+    placeList(1, 1, to, gamesRef.current);
+    await tween(220, (p) => placeZoom(to, 1 - p));
+    hideZoom();
+    busy.current = false;
+  };
+
+  const listNav = useRef({ openMatch, backToList, openGame, backToGames });
   useEffect(() => {
-    listNav.current = { openMatch, backToList };
+    listNav.current = { openMatch, backToList, openGame, backToGames };
   });
 
   // A press during a transition is remembered and played right after it
@@ -319,13 +382,15 @@ export default function PolygameScreen() {
         setMuted(!isMuted());
         return;
       }
-      // Screen 0 handles its own keys (N, 1–9, Delete)
-      if (listOpenRef.current) return;
+      // Z goes up one level: match → match list → games
       if (e.key.toLowerCase() === "z") {
         e.preventDefault();
-        void listNav.current.backToList();
+        if (!listOpenRef.current) void listNav.current.backToList();
+        else if (!gamesOpenRef.current) void listNav.current.backToGames();
         return;
       }
+      // the games page / match list handle their own keys (N, 1–9, Delete)
+      if (listOpenRef.current) return;
       // Game controls only work on the Polygame screen
       if (viewRef.current !== 0) return;
 
@@ -339,6 +404,28 @@ export default function PolygameScreen() {
         return;
       }
       const letter = e.key.toLowerCase();
+      if (stateRef.current.game === "garden") {
+        // Shift + 1–9: starting chances for every Garden match
+        const digit = /^(Digit|Numpad)([1-9])$/.exec(e.code)?.[2];
+        if (digit && e.shiftKey) {
+          e.preventDefault();
+          sfx.newMatch();
+          dispatch({ type: "setGardenChances", n: +digit });
+          return;
+        }
+        // E / D: team 1 uses / gets back a chance · I / J: team 2
+        const ch = ({ e: [0, -1], d: [0, 1], i: [1, -1], j: [1, 1] } as Record<string, [0 | 1, number]>)[letter];
+        if (ch) {
+          e.preventDefault();
+          const [team, delta] = ch;
+          const left = stateRef.current.teams[team].chances;
+          if (delta < 0 && left === 1) sfx.slam(0.05);
+          else if (delta < 0 && left > 0) sfx.shapeRemove();
+          else if (delta > 0) sfx.shapeRestore();
+          dispatch({ type: "useChance", team, delta });
+          return;
+        }
+      }
       // Shift+X twice within 2s resets both boards, timers and points
       if (letter === "x" && e.shiftKey) {
         if (now - resetArm.current < 2000) {
@@ -370,6 +457,13 @@ export default function PolygameScreen() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // scores carried into this game, and the cumulative totals for Game Stats
+  const openM = state.current ? state.matches.find((m) => m.id === state.current) : undefined;
+  const totals: [number, number] = openM
+    ? [cumulative(openM, state.game, 0), cumulative(openM, state.game, 1)]
+    : [teamTotal(state.teams[0].stats), teamTotal(state.teams[1].stats)];
+  const carry: [number, number] = openM ? [slotCarry(openM, state.game, 0), slotCarry(openM, state.game, 1)] : [0, 0];
+
   return (
     // overflow-clip (not hidden) so focusing a control can never scroll the stage
     <main
@@ -390,7 +484,7 @@ export default function PolygameScreen() {
 
         {/* Game Stats */}
         <div ref={(el) => void (layerRefs.current[2] = el)} inert={view !== "final"} className="absolute inset-0 z-10">
-          <FinalScreen on={drawn[2]} teams={state.teams} />
+          <FinalScreen on={drawn[2]} teams={state.teams} totals={totals} title={GAME_INFO[state.game].title} />
         </div>
 
         {/* Phase Stats */}
@@ -407,14 +501,14 @@ export default function PolygameScreen() {
             <div className="flex h-full items-center">
               <div className="flex h-full w-[360px] flex-col justify-center border-r border-[var(--neon-dim)] pl-10">
                 <span className="text-[13px] font-semibold uppercase tracking-[0.4em] text-[var(--text-dim)]">
-                  TRSYP 3.0 · Game 01
+                  TRSYP 3.0 · Game {String(GAME_INFO[state.game].num).padStart(2, "0")}
                 </span>
                 <span className="mt-1 text-[22px] font-semibold uppercase tracking-[0.2em] text-[var(--text)]">
                   Game name
                 </span>
               </div>
               <h1 className="neon-text flex-1 text-center font-[family-name:var(--font-display)] text-[64px] uppercase leading-none tracking-[0.25em]">
-                Polygame
+                {GAME_INFO[state.game].title}
               </h1>
               <div className="w-[360px]" />
             </div>
@@ -422,14 +516,28 @@ export default function PolygameScreen() {
 
           {/* Two teams, split down the middle */}
           <div className="relative grid min-h-0 flex-1 grid-cols-2 gap-16">
-            <TeamPanel id={0} team={state.teams[0]} dispatch={dispatch} active={!listOpen && view === "game"} />
+            <TeamPanel
+              id={0}
+              team={state.teams[0]}
+              dispatch={dispatch}
+              active={!listOpen && view === "game"}
+              variant={state.game === "garden" ? "garden" : "polygame"}
+              carried={carry[0]}
+            />
             <div
               className="absolute bottom-2 left-1/2 top-2 w-px -translate-x-1/2 bg-[var(--neon-dim)]"
               aria-hidden
             >
               <span className="absolute left-1/2 top-1/2 h-24 w-[3px] -translate-x-1/2 -translate-y-1/2 bg-[var(--pink)] shadow-[0_0_10px_var(--pink)]" />
             </div>
-            <TeamPanel id={1} team={state.teams[1]} dispatch={dispatch} active={!listOpen && view === "game"} />
+            <TeamPanel
+              id={1}
+              team={state.teams[1]}
+              dispatch={dispatch}
+              active={!listOpen && view === "game"}
+              variant={state.game === "garden" ? "garden" : "polygame"}
+              carried={carry[1]}
+            />
           </div>
         </div>
         </div>
@@ -444,11 +552,21 @@ export default function PolygameScreen() {
           <ParticleField />
           <MatchesScreen
             on={listOn}
-            active={listOpen}
+            active={listOpen && !gamesOpen}
             state={state}
             dispatch={dispatch}
             onOpen={(id, el) => void listNav.current.openMatch(id, el)}
           />
+        </div>
+
+        {/* Page −1: the three games (opaque, on top while open) */}
+        <div
+          ref={gamesRef}
+          inert={!gamesOpen}
+          className={`absolute inset-0 z-[36] bg-[var(--bg)] ${gamesOpen ? "" : "pointer-events-none invisible"}`}
+        >
+          <ParticleField />
+          <GamesScreen on={gamesOn} state={state} onOpen={(g, el) => void listNav.current.openGame(g, el)} />
         </div>
 
         {/* the card that grows into a full screen (and shrinks back) */}
@@ -516,6 +634,7 @@ function HelpOverlay({ onClose }: { onClose: () => void }) {
           </table>
           <ul className="mt-6 space-y-1.5 text-base text-[var(--text-dim)]">
             <li><Kbd>Space</Kbd> start / pause both timers</li>
+            <li>Garden: click the chances number (right click gives one back) or <Kbd>E</Kbd>/<Kbd>D</Kbd> team 1, <Kbd>I</Kbd>/<Kbd>J</Kbd> team 2 · <Kbd>Shift</Kbd>+<Kbd>1–9</Kbd> starting chances</li>
             <li>Matches screen: <Kbd>N</Kbd> new match (then 1–9 twice) · click a card to open · hover + <Kbd>Del</Kbd> twice to remove · <Kbd>Z</Kbd> back to the list from any screen</li>
             <li><Kbd>→</Kbd> next screen (Polygame → Phase Stats → Game Stats → Leaderboard) · <Kbd>←</Kbd> back</li>
             <li>Leaderboard: hover points and type · double-click a name to rename</li>

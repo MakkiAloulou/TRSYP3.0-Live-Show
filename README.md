@@ -2,6 +2,10 @@
 
 Live match screens for the TRSYP 3.0 robotics competition. Built screen by screen, merged later.
 
+## Page −1 — Games
+
+The app opens on the three games: **01 Polygame**, **02 Garden**, **03** (coming soon). Click a game to zoom into its match list. The same pairs of teams play every game in order, and **scores carry over**: a team starts Garden with its Polygame total. `Z` always goes up one level (match → match list → games).
+
 ## Screen 0 — Matches
 
 The app opens on a grid of match cards ("CUBOT VS TEST 2"), each with a status — UPCOMING, LIVE (opened) or DONE (its points are on the leaderboard) — and the final totals once done. Click a card: the stage zooms into it and it becomes the Polygame screen for that match. `Z` zooms back out to the list from any screen.
@@ -37,6 +41,12 @@ Press `→` again from Phase Stats. Shows each team's **total score** (taken fro
 Press `→` from Game Stats. All 9 teams (placeholders for now; everyone starts on 0 with CUBOT 6th), ranked by points, with games played. The first time it opens after a match, it shows the old standings, then 3 s later each playing team's Game Stats total is added: points count up, a `+N` badge pops, rows slide to their new places and ▲/▼ show how far each team moved. Teams are matched by name to the two Polygame teams. Each match is added only once; equal points keep the previous order.
 
 Fix things by hand: hover a team's points and type; double-click a name to rename. `Shift+X` twice starts a new match (clears boards, timers, points and stats, keeps the leaderboard).
+
+## Game 2 — Garden
+
+Same screen as Polygame, but under each camera there's a big **CHANCES LEFT** number instead of the shapes and grid. Left-click it (or `E` team 1 / `I` team 2) to use a chance, right-click (or `D` / `J`) to give one back. At 0 it turns red and **OUT** flashes. `Shift+1–9` sets the starting chances for every Garden match. The current total starts at the team's Polygame total.
+
+Flow: Garden → **Game Stats** (no Phase Stats; cumulative scores and the dominant team) → **Leaderboard** (adds only the points earned in Garden).
 
 ## Sound
 

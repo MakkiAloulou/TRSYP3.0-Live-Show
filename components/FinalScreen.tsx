@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type CSSProperties } from "react";
-import { teamTotal, type TeamId, type TeamState } from "@/lib/game";
+import { type TeamId, type TeamState } from "@/lib/game";
 import { sfx } from "@/lib/sfx";
 import { CountUp, DrawPath, framePath, Line, Reveal, timing } from "./Draw";
 
@@ -32,9 +32,12 @@ const v = (ms: number) => ({ "--delay": `${ms}ms` }) as CSSProperties;
 interface Props {
   on: boolean;
   teams: [TeamState, TeamState];
+  /** Cumulative scores (carried from earlier games + this one) */
+  totals: [number, number];
+  title: string;
 }
 
-export default function FinalScreen({ on, teams }: Props) {
+export default function FinalScreen({ on, teams, totals, title }: Props) {
   const [reveal, setReveal] = useState(false);
 
   // Reveal 6 s after the screen draws in; hide at once when leaving
@@ -51,7 +54,6 @@ export default function FinalScreen({ on, teams }: Props) {
     return () => clearTimeout(t);
   }, [on]);
 
-  const totals = [teamTotal(teams[0].stats), teamTotal(teams[1].stats)];
   const leader: TeamId | null = totals[0] === totals[1] ? null : totals[0] > totals[1] ? 0 : 1;
   const showReveal = on && reveal;
 
@@ -75,7 +77,7 @@ export default function FinalScreen({ on, teams }: Props) {
       {/* ── Title ── */}
       <Reveal on={on} d={320} className="absolute left-0 right-0 text-center" style={{ top: Y0 + 26 }}>
         <div className="text-[15px] font-semibold uppercase tracking-[0.55em] text-[var(--text-dim)]">
-          TRSYP 3.0 · Polygame
+          TRSYP 3.0 · {title}
         </div>
         <h1 className="neon-text mt-1 font-[family-name:var(--font-display)] text-[68px] uppercase leading-none tracking-[0.22em]">
           Game Stats

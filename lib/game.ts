@@ -43,6 +43,8 @@ export interface TeamState {
   timer: TimerState;
   points: number;
   stats: TeamStats;
+  /** Garden: chances left */
+  chances: number;
 }
 
 /** One of the 9 teams on the overall leaderboard */
@@ -53,18 +55,33 @@ export interface LeagueTeam {
   played: number;
 }
 
-/** One match on screen 0: two league teams and everything played in it */
-export interface Match {
-  id: string;
-  num: number;
+/* The three competition games. The same pairs of teams play all of them, in
+   order, and their score carries over from one game to the next. */
+export const GAMES = ["polygame", "garden", "game3"] as const;
+export type GameKind = (typeof GAMES)[number];
+export const GAME_INFO: Record<GameKind, { num: number; title: string; ready: boolean }> = {
+  polygame: { num: 1, title: "Polygame", ready: true },
+  garden: { num: 2, title: "Garden", ready: true },
+  game3: { num: 3, title: "Game 3", ready: false },
+};
+
+/** One game played by one pair: both teams' boards/stats and its league bookkeeping */
+export interface GameSlot {
   teams: [TeamState, TeamState];
   opened: boolean;
   committed: boolean;
   /** Points already added to the league for each team (so corrections add only the difference) */
   applied: Record<string, number>;
 }
+
+/** One pair of teams on screen 0, with a slot for every game */
+export interface Match {
+  id: string;
+  num: number;
+  games: Record<GameKind, GameSlot>;
+}
 export type MatchStatus = "upcoming" | "live" | "done";
-export const matchStatus = (m: Match): MatchStatus => (m.committed ? "done" : m.opened ? "live" : "upcoming");
+export const slotStatus = (g: GameSlot): MatchStatus => (g.committed ? "done" : g.opened ? "live" : "upcoming");
 
 export interface GameState {
   /** Working copy of the open match's two teams (mirrored into `matches`) */
@@ -78,6 +95,10 @@ export interface GameState {
   matches: Match[];
   /** id of the open match (null = none opened yet) */
   current: string | null;
+  /** which game screen 0 and the open match are on */
+  game: GameKind;
+  /** Garden: starting chances for every match */
+  gardenChances: number;
 }
 
 export type Action =
@@ -96,6 +117,9 @@ export type Action =
   | { type: "addMatch"; a: string; b: string }
   | { type: "deleteMatch"; id: string }
   | { type: "openMatch"; id: string }
+  | { type: "selectGame"; game: GameKind }
+  | { type: "useChance"; team: TeamId; delta: number }
+  | { type: "setGardenChances"; n: number }
   | { type: "renameLeague"; id: string; name: string }
   | { type: "editLeaguePoints"; id: string; key: string }
   | { type: "load"; state: GameState };
@@ -183,6 +207,7 @@ const freshTeam = (name: string): TeamState => ({
   timer: freshTimer(),
   points: 0,
   stats: freshStats(),
+  chances: 3,
 });
 
 /** Fill in anything a save from an older version is missing. */
@@ -191,33 +216,87 @@ const normTeam = (t: TeamState): TeamState => {
   return { ...base, ...t, grid: (t.grid ?? base.grid).map(toCell), stats: { ...base.stats, ...t.stats } };
 };
 
+const normSlot = (g: GameSlot): GameSlot => ({
+  teams: g.teams.map(normTeam) as GameSlot["teams"],
+  opened: !!g.opened,
+  committed: !!g.committed,
+  applied: g.applied ?? {},
+});
+
+const freshSlot = (league: LeagueTeam[], a: string, b: string, chances: number): GameSlot => {
+  const team = (tid: string) => ({ ...freshTeam(league.find((l) => l.id === tid)?.name ?? "?"), leagueId: tid, chances });
+  return { teams: [team(a), team(b)], opened: false, committed: false, applied: {} };
+};
+
+const newMatch = (league: LeagueTeam[], id: string, num: number, a: string, b: string, chances: number): Match => ({
+  id,
+  num,
+  games: {
+    polygame: freshSlot(league, a, b, chances),
+    garden: freshSlot(league, a, b, chances),
+    game3: freshSlot(league, a, b, chances),
+  },
+});
+
 export const normalizeState = (s: GameState): GameState => {
   const league = Array.isArray(s.league) && s.league.length ? s.league : freshLeague();
-  const teams = s.teams.map(normTeam) as GameState["teams"];
-  const matches = Array.isArray(s.matches)
-    ? s.matches.map((m) => ({ ...m, applied: m.applied ?? {}, teams: m.teams.map(normTeam) as Match["teams"] }))
-    : [];
+  const chances = s.gardenChances ?? 3;
+  const matches = (Array.isArray(s.matches) ? s.matches : []).map((m) => {
+    const old = m as unknown as Partial<GameSlot> & Match; // saves from before games existed
+    const ids = (old.games?.polygame ?? old).teams?.map((t) => t.leagueId ?? "") ?? ["", ""];
+    const base = newMatch(league, m.id, m.num, ids[0], ids[1], chances);
+    const games = old.games ?? { polygame: { teams: old.teams!, opened: !!old.opened, committed: !!old.committed, applied: old.applied ?? {} } };
+    return {
+      id: m.id,
+      num: m.num,
+      games: Object.fromEntries(GAMES.map((g) => [g, games[g] ? normSlot(games[g]) : base.games[g]])) as Match["games"],
+    };
+  });
   return {
     league,
-    teams,
+    teams: s.teams.map(normTeam) as GameState["teams"],
     matchCommitted: !!s.matchCommitted,
     applied: s.applied ?? {},
     matches,
     current: s.current ?? null,
+    game: s.game ?? "polygame",
+    gardenChances: chances,
   };
-};
-
-const newMatch = (league: LeagueTeam[], id: string, num: number, a: string, b: string): Match => {
-  const team = (tid: string) => ({ ...freshTeam(league.find((l) => l.id === tid)?.name ?? "?"), leagueId: tid });
-  return { id, num, teams: [team(a), team(b)], opened: false, committed: false, applied: {} };
 };
 
 export const initialState = (): GameState => {
   const league = freshLeague();
   // one starter match so screen 0 isn't empty
-  const first = newMatch(league, "m1", 1, "t6", "t7"); // fixed id: same on server and client
-  return { teams: first.teams, league, matchCommitted: false, applied: {}, matches: [first], current: null };
+  const first = newMatch(league, "m1", 1, "t6", "t7", 3); // fixed id: same on server and client
+  return {
+    teams: first.games.polygame.teams,
+    league,
+    matchCommitted: false,
+    applied: {},
+    matches: [first],
+    current: null,
+    game: "polygame",
+    gardenChances: 3,
+  };
 };
+
+/** Score a team brings into the current game from the games before it (same match). */
+export const carriedIn = (s: GameState, team: TeamId): number => {
+  const m = s.current ? s.matches.find((x) => x.id === s.current) : null;
+  if (!m) return 0;
+  return slotCarry(m, s.game, team);
+};
+
+/** Points a team scored in one game of a match. Polygame = Phase total; Garden = its points counter. */
+export const gameScore = (game: GameKind, t: TeamState) => (game === "polygame" ? teamTotal(t.stats) : t.points);
+
+/** Sum of the games before `game` for this match. */
+export const slotCarry = (m: Match, game: GameKind, team: TeamId) =>
+  GAMES.slice(0, GAMES.indexOf(game)).reduce((sum, g) => sum + gameScore(g, m.games[g].teams[team]), 0);
+
+/** Cumulative score shown for a team after `game` (carried + this game). */
+export const cumulative = (m: Match, game: GameKind, team: TeamId) =>
+  slotCarry(m, game, team) + gameScore(game, m.games[game].teams[team]);
 
 function freshLeague(): LeagueTeam[] {
   // Starting order (everyone on 0): CUBOT starts 6th
@@ -236,7 +315,7 @@ export const matchGains = (s: GameState): Record<string, number> => {
   if (!s.current) return gains;
   for (const t of s.teams) {
     const lt = s.league.find((l) => (t.leagueId ? l.id === t.leagueId : sameName(l.name, t.name)));
-    if (lt) gains[lt.id] = (gains[lt.id] ?? 0) + teamTotal(t.stats);
+    if (lt) gains[lt.id] = (gains[lt.id] ?? 0) + gameScore(s.game, t);
   }
   return gains;
 };
@@ -309,7 +388,15 @@ export function reducer(s: GameState, a: Action): GameState {
   return {
     ...n,
     matches: n.matches.map((m) =>
-      m.id === n.current ? { ...m, teams: n.teams, committed: n.matchCommitted, applied: n.applied } : m,
+      m.id === n.current
+        ? {
+            ...m,
+            games: {
+              ...m.games,
+              [n.game]: { ...m.games[n.game], teams: n.teams, committed: n.matchCommitted, applied: n.applied },
+            },
+          }
+        : m,
     ),
   };
 }
@@ -373,7 +460,7 @@ function baseReducer(s: GameState, a: Action): GameState {
       return {
         ...s,
         league: s.matchCommitted ? revertApplied(s.league, s.applied, true) : s.league,
-        teams: s.teams.map((t) => ({ ...freshTeam(t.name), leagueId: t.leagueId })) as GameState["teams"],
+        teams: s.teams.map((t) => ({ ...freshTeam(t.name), leagueId: t.leagueId, chances: s.gardenChances })) as GameState["teams"],
         matchCommitted: false,
         applied: {},
       };
@@ -393,14 +480,19 @@ function baseReducer(s: GameState, a: Action): GameState {
     }
     case "addMatch": {
       const num = Math.max(0, ...s.matches.map((m) => m.num)) + 1;
-      return { ...s, matches: [...s.matches, newMatch(s.league, `m${num}-${Date.now().toString(36)}`, num, a.a, a.b)] };
+      return { ...s, matches: [...s.matches, newMatch(s.league, `m${num}-${Date.now().toString(36)}`, num, a.a, a.b, s.gardenChances)] };
     }
     case "deleteMatch": {
       const m = s.matches.find((x) => x.id === a.id);
       if (!m) return s;
+      // take every game this pair already put on the leaderboard back off
+      const league = GAMES.reduce(
+        (l, g) => (m.games[g].committed ? revertApplied(l, m.games[g].applied, true) : l),
+        s.league,
+      );
       return {
         ...s,
-        league: m.committed ? revertApplied(s.league, m.applied, true) : s.league,
+        league,
         matches: s.matches.filter((x) => x.id !== a.id),
         current: s.current === a.id ? null : s.current,
       };
@@ -408,18 +500,42 @@ function baseReducer(s: GameState, a: Action): GameState {
     case "openMatch": {
       const m = s.matches.find((x) => x.id === a.id);
       if (!m) return s;
+      const slot = m.games[s.game];
       // names follow the league (in case a team was renamed there)
-      const named = m.teams.map((t) => ({
+      const named = slot.teams.map((t) => ({
         ...t,
         name: s.league.find((l) => l.id === t.leagueId)?.name ?? t.name,
-      })) as Match["teams"];
+      })) as GameSlot["teams"];
       return {
         ...s,
         current: m.id,
         teams: named,
-        matchCommitted: m.committed,
-        applied: m.applied,
-        matches: s.matches.map((x) => (x.id === m.id ? { ...x, opened: true, teams: named } : x)),
+        matchCommitted: slot.committed,
+        applied: slot.applied,
+        matches: s.matches.map((x) =>
+          x.id === m.id ? { ...x, games: { ...x.games, [s.game]: { ...slot, opened: true, teams: named } } } : x,
+        ),
+      };
+    }
+    case "selectGame":
+      // leave any open match first, so nothing syncs into the wrong game
+      return { ...s, game: a.game, current: null };
+    case "useChance":
+      return updateTeam(s, a.team, (t) => ({ ...t, chances: Math.min(9, Math.max(0, t.chances + a.delta)) }));
+    case "setGardenChances": {
+      // new starting chances for every Garden game that isn't finished (the open one too)
+      const n = Math.min(9, Math.max(1, a.n));
+      const reset = (g: GameSlot): GameSlot =>
+        g.committed ? g : { ...g, teams: g.teams.map((t) => ({ ...t, chances: n })) as GameSlot["teams"] };
+      const teams =
+        s.game === "garden" && !s.matchCommitted
+          ? (s.teams.map((t) => ({ ...t, chances: n })) as GameState["teams"])
+          : s.teams;
+      return {
+        ...s,
+        gardenChances: n,
+        teams,
+        matches: s.matches.map((m) => ({ ...m, games: { ...m.games, garden: reset(m.games.garden) } })),
       };
     }
     case "renameLeague":

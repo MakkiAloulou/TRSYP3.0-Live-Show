@@ -13,9 +13,13 @@ interface Props {
   dispatch: (a: Action) => void;
   /** false while another screen is showing, so typing can't edit this grid */
   active: boolean;
+  /** Polygame shows shapes + grid; Garden shows the chances counter */
+  variant?: "polygame" | "garden";
+  /** Score carried in from earlier games (added to the current total) */
+  carried?: number;
 }
 
-export default function TeamPanel({ id, team, dispatch, active }: Props) {
+export default function TeamPanel({ id, team, dispatch, active, variant = "polygame", carried = 0 }: Props) {
   const [editing, setEditing] = useState(false);
 
   return (
@@ -61,7 +65,18 @@ export default function TeamPanel({ id, team, dispatch, active }: Props) {
         </div>
       </HudFrame>
 
-      {/* Shapes board (left) + 5x5 grid (right) */}
+      {/* Polygame: shapes board (left) + 5x5 grid (right) · Garden: chances left */}
+      {variant === "garden" ? (
+        <Chances
+          value={team.chances}
+          onChange={(delta) => {
+            if (delta < 0 && team.chances === 1) sfx.slam(0.05);
+            else if (delta < 0) sfx.shapeRemove();
+            else sfx.shapeRestore();
+            dispatch({ type: "useChance", team: id, delta });
+          }}
+        />
+      ) : (
       <div className="flex h-[290px] w-full items-stretch gap-4 px-2">
         <HudFrame className="min-w-0 flex-1" cut={14}>
           <div className="flex h-full flex-col px-5 pb-3 pt-3">
@@ -103,6 +118,7 @@ export default function TeamPanel({ id, team, dispatch, active }: Props) {
           </div>
         </HudFrame>
       </div>
+      )}
 
       {/* Timer | current total */}
       <HudFrame className="h-[112px] w-full shrink-0" cut={16}>
@@ -114,12 +130,49 @@ export default function TeamPanel({ id, team, dispatch, active }: Props) {
           <div className="flex flex-col items-center justify-center">
             <Label>Current total</Label>
             <span className="digits pink-text text-[58px] leading-none" aria-live="polite">
-              {team.points}
+              {carried + team.points}
             </span>
+            {variant === "garden" && (
+              <span className="digits mt-1 text-[13px] tracking-[0.2em] text-[var(--text-dim)]">
+                {carried} carried + {team.points}
+              </span>
+            )}
           </div>
         </div>
       </HudFrame>
     </section>
+  );
+}
+
+/** Garden: big "chances left" number. Left click uses one, right click gives one back. */
+function Chances({ value, onChange }: { value: number; onChange: (delta: number) => void }) {
+  const out = value === 0;
+  return (
+    <HudFrame className="h-[290px] w-full shrink-0" cut={14} tracer={out}>
+      <button
+        onClick={() => onChange(-1)}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          onChange(1);
+        }}
+        aria-label={`Chances left: ${value}`}
+        className="relative flex h-full w-full cursor-pointer flex-col items-center justify-center"
+      >
+        <Label>Chances left</Label>
+        <span
+          key={value}
+          className={`slam digits mt-2 text-[170px] leading-none ${out ? "text-[var(--cell-red)]" : "neon-text"}`}
+          style={out ? { textShadow: "0 0 24px var(--cell-red), 0 0 60px rgba(242,85,107,0.5)" } : undefined}
+        >
+          {value}
+        </span>
+        {out && (
+          <span className="blink absolute right-10 top-1/2 -translate-y-1/2 border-2 border-[var(--cell-red)] px-4 py-1 font-[family-name:var(--font-display)] text-[40px] tracking-[0.2em] text-[var(--cell-red)] shadow-[0_0_20px_rgba(242,85,107,0.6)]">
+            OUT
+          </span>
+        )}
+      </button>
+    </HudFrame>
   );
 }
 
