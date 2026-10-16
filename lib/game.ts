@@ -122,6 +122,18 @@ export const initialState = (): GameState => ({
   teams: [freshTeam("CUBOT"), freshTeam("TEST 2")],
 });
 
+/** Accepts any older saved / in-memory cell shape and returns a valid GridCell. */
+export function toCell(raw: unknown): GridCell {
+  const c = raw as Partial<GridCell> | [GridColor, GridColor] | null | undefined;
+  if (Array.isArray(c)) return { colors: [c[0] ?? 0, c[1] ?? 0], full: false, label: "", halfLabels: ["", ""] };
+  return {
+    colors: Array.isArray(c?.colors) ? [c.colors[0] ?? 0, c.colors[1] ?? 0] : [0, 0],
+    full: !!c?.full,
+    label: c?.label ?? "",
+    halfLabels: Array.isArray(c?.halfLabels) ? [c.halfLabels[0] ?? "", c.halfLabels[1] ?? ""] : ["", ""],
+  };
+}
+
 const nextColor = (c: GridColor) => ((c + 1) % 3) as GridColor;
 
 export const elapsedMs = (t: TimerState, now: number) =>
@@ -141,7 +153,7 @@ const updateTeam = (s: GameState, team: TeamId, fn: (t: TeamState) => TeamState)
 const updateCell = (s: GameState, team: TeamId, index: number, fn: (c: GridCell) => GridCell) =>
   updateTeam(s, team, (t) => {
     const grid = [...t.grid];
-    grid[index] = fn(grid[index]);
+    grid[index] = fn(toCell(grid[index]));
     return { ...t, grid };
   });
 

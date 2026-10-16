@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import type { GridCell, GridColor } from "@/lib/game";
+import { toCell, type GridCell, type GridColor } from "@/lib/game";
 
 const FILL: Record<GridColor, string> = {
   0: "var(--cell-white)",
@@ -52,7 +52,8 @@ export default function ColorGrid({ grid, onCell, onHalf, onKey }: Props) {
       aria-label="5 by 5 grid"
       onPointerLeave={() => (hover.current = null)}
     >
-      {grid.map((cell, i) => {
+      {grid.map((raw, i) => {
+        const cell = toCell(raw);
         const [a, b] = cell.colors;
         const coloured = a !== 0 || b !== 0;
         const glow = cell.full ? `0 0 10px ${FILL[a]}` : "none";
