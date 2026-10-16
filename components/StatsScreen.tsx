@@ -173,6 +173,18 @@ export default function StatsScreen({ on, active, game, teams, dispatch }: Props
                 {teams[t].name}
                 <span className="ml-4 inline-block h-2.5 w-2.5 -translate-y-2 rotate-45 bg-[var(--pink)] shadow-[0_0_8px_var(--pink)]" />
               </h2>
+              {phases && teams[t].pinned && (
+                <span
+                  className={`reveal ${on ? "on" : ""} mt-2 inline-flex items-center gap-2 border-2 border-[var(--cell-red)] bg-[#1a0610]/85 px-4 py-1 font-[family-name:var(--font-display)] text-[22px] uppercase leading-none tracking-[0.2em] text-[var(--cell-red)] shadow-[0_0_18px_rgba(242,85,107,0.5)]`}
+                  style={{ ...timing(on, 820 + o, 420), textShadow: "0 0 12px rgba(242,85,107,0.8)" }}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path d="M12 17v5" />
+                    <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z" />
+                  </svg>
+                  Pinned
+                </span>
+              )}
             </div>
 
             {/* column header over the bonus points */}

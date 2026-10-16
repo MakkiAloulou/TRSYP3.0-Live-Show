@@ -2,18 +2,17 @@
 
 Live match screens for the TRSYP 3.0 robotics competition. Built screen by screen, merged later.
 
-## Page −1 — Games
+## Page −1 — League / Cup
 
-The app opens on the three games: **01 Polygame**, **02 Garden**, **03 Mine**. Click a game to zoom into its match list. The same pairs of teams play every game in order, and **scores carry over**: a team starts Garden with its Polygame total. `Z` always goes up one level (match → match list → games).
+The app opens on two cards: **League game** (Polygame + Garden) and **Cup game** (Mine). `Z` always goes up one level (match → match list / bracket → games → League / Cup). **`Tab`** shows the full league leaderboard over any screen (Tab or Esc closes it; it never adds points).
 
-## Screen 0 — Matches
+### League
 
-The app opens on a grid of match cards ("CUBOT VS TEST 2"), each with a status — UPCOMING, LIVE (opened) or DONE (its points are on the leaderboard) — and the final totals once done. Click a card: the stage zooms into it and it becomes the Polygame screen for that match. `Z` zooms back out to the list from any screen.
+League → **Polygame** or **Garden** → **9 match slots** (3 × 3). Played matches are dimmed, the next match to play glows and breathes, the rest stay normal. Hover a slot + `N` to set its two teams (`1`–`9` for team A, then team B); hover + `Delete` twice clears a slot (its points come back off the leaderboard). The same pairs play Polygame then Garden, and scores carry over.
 
-- `N` — new match, then press `1`–`9` for team A and again for team B (Backspace undo, Esc cancel)
-- Hover a card + `Delete` twice — remove it (a DONE match's points are taken back off the leaderboard)
+### Cup
 
-Every match keeps its own boards, timers and stats. Reopening a DONE match and correcting a score makes the leaderboard apply only the difference (games played isn't counted twice). `Shift+X` twice restarts the open match and takes its points back off.
+Cup → **Mine** → the **Champions Cup** bracket: the league's **top 4** on the left, **DRAW** (`D`) spins the names like a slot machine into two semi-finals (redraw allowed until a cup match is opened; `Shift+D` twice resets the cup). Click a match to play it in Mine (scores start from 0, cup points never touch the league). After its Game Stats, `→` goes back to the bracket: the higher score goes through (on a tie, click the winner), the two winners meet in the **Final**, and the final winner is crowned **CHAMPION**.
 
 ## Screen 1 — Polygame
 
@@ -23,7 +22,7 @@ A fixed 1920×1080 stage that scales to the window. Two teams, each with:
 - **Shapes board** — 35 pieces in a flat top view (5 columns × green triangle, red/blue top triangle, red/blue cube, red/blue bottom triangle). Pieces are numbered 1–30 zigzagging down each column (greens unnumbered). Left click removes a piece (dashed outline stays; left click again brings it back). Right click greys it (right click again restores).
 - **5×5 grid** — each square is split on its diagonal into two triangles. Left click colours the whole square (no diagonal shown), right click colours one triangle (the diagonal stays, drawn clearly). Colours cycle white → red → blue → white. To number a square, hover it and type digits: a full square gets one number, a split square gets one per triangle. `Backspace` deletes a digit, `Delete` clears.
 - **Timer** (counts up) and **current total** (manual).
-- **PINNED** — `R` (team 1) / `U` (team 2) puts a red "PINNED" badge with a pin icon on that team's camera; press again or click the badge to remove it.
+- **PINNED** — `R` (team 1) / `U` (team 2) puts a red "PINNED" badge with a pin icon on that team's camera (and next to its name on Phase Stats); press again or click the badge to remove it.
 
 State is saved in the browser, so a refresh mid-match keeps everything.
 

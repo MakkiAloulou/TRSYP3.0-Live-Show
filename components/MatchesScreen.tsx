@@ -1,14 +1,25 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { cumulative, GAME_INFO, slotStatus, type Action, type GameKind, type GameState, type Match } from "@/lib/game";
+import {
+  cumulative,
+  GAME_INFO,
+  leagueMatches,
+  nextMatchId,
+  slotStatus,
+  type Action,
+  type GameKind,
+  type GameState,
+  type Match,
+} from "@/lib/game";
 import { sfx } from "@/lib/sfx";
 import { DrawPath, framePath, Line, Reveal } from "./Draw";
 import HudFrame from "./HudFrame";
 
-/* Screen 0: every match as a card. Click a card to open it (the stage zooms
-   into it). Keyboard: N = new match (then 1–9 for team A and team B),
-   hover a card + Delete twice = remove it. */
+/* Screen 0 (league): the 9 match slots as cards. Click a card to open it (the
+   stage zooms into it). Played matches are dimmed, the next one to play
+   glows. Hover a slot + N = set its two teams (1–9, then 1–9);
+   hover + Delete twice = clear the slot. */
 
 const X0 = 150;
 const X1 = 1770;
@@ -28,13 +39,17 @@ interface Props {
 }
 
 export default function MatchesScreen({ on, active, state, dispatch, onOpen }: Props) {
-  const { matches, league } = state;
-  const [picking, setPicking] = useState<{ a: string | null } | null>(null);
+  const { league } = state;
+  const matches = leagueMatches(state);
+  const nextId = nextMatchId(state, state.game);
+  // which slot is being filled, and team A once chosen
+  const [picking, setPicking] = useState<{ slot: string; a: string | null } | null>(null);
   const [armed, setArmed] = useState<string | null>(null);
   const hover = useRef<string | null>(null);
-  const live = useRef({ active, picking, armed, league, dispatch });
+  const firstEmpty = leagueMatches(state).find((m) => m.empty)?.id ?? null;
+  const live = useRef({ active, picking, armed, league, dispatch, firstEmpty });
   useEffect(() => {
-    live.current = { active, picking, armed, league, dispatch };
+    live.current = { active, picking, armed, league, dispatch, firstEmpty };
   });
 
   // teams listed 1–9 in a fixed order (not by rank), so the keys never change
@@ -45,10 +60,10 @@ export default function MatchesScreen({ on, active, state, dispatch, onOpen }: P
     if (!p) return;
     if (!p.a) {
       sfx.gridTick();
-      setPicking({ a: id });
+      setPicking({ ...p, a: id });
     } else if (id !== p.a) {
       sfx.gain();
-      live.current.dispatch({ type: "addMatch", a: p.a, b: id });
+      live.current.dispatch({ type: "setPair", id: p.slot, a: p.a, b: id });
       setPicking(null);
     }
   };
@@ -66,7 +81,7 @@ export default function MatchesScreen({ on, active, state, dispatch, onOpen }: P
       if (p) {
         e.preventDefault();
         if (e.key === "Escape") setPicking(null);
-        else if (e.key === "Backspace") setPicking({ a: null });
+        else if (e.key === "Backspace") setPicking({ ...p, a: null });
         else {
           const digit = /^(Digit|Numpad)([1-9])$/.exec(e.code)?.[2];
           if (digit) {
@@ -78,9 +93,12 @@ export default function MatchesScreen({ on, active, state, dispatch, onOpen }: P
         return;
       }
       if (letter === "n") {
+        // fill the hovered slot (or the first empty one)
+        const slot = hover.current ?? live.current.firstEmpty;
+        if (!slot) return;
         e.preventDefault();
         sfx.timerStart();
-        setPicking({ a: null });
+        setPicking({ slot, a: null });
         return;
       }
       if (e.key === "Delete" && hover.current) {
@@ -88,7 +106,7 @@ export default function MatchesScreen({ on, active, state, dispatch, onOpen }: P
         const id = hover.current;
         if (arm === id) {
           sfx.shapeRemove();
-          live.current.dispatch({ type: "deleteMatch", id });
+          live.current.dispatch({ type: "clearMatch", id });
           setArmed(null);
         } else {
           sfx.pointDown();
@@ -107,10 +125,9 @@ export default function MatchesScreen({ on, active, state, dispatch, onOpen }: P
     return () => clearTimeout(t);
   }, [armed]);
 
-  // grid sizing: 3 columns up to 9 matches, then 4 columns with shorter cards
-  const n = matches.length + 0;
-  const cols = n <= 9 ? 3 : 4;
-  const rows = Math.max(1, Math.ceil(n / cols));
+  // 9 slots: a 3 × 3 grid
+  const cols = 3;
+  const rows = 3;
   const gap = 28;
   const cardW = (X1 - X0 - 120 - gap * (cols - 1)) / cols;
   const cardH = Math.min(190, (GRID_BOTTOM - GRID_TOP - gap * (rows - 1)) / rows);
@@ -133,14 +150,6 @@ export default function MatchesScreen({ on, active, state, dispatch, onOpen }: P
         </h1>
       </Reveal>
 
-      {matches.length === 0 && (
-        <Reveal on={on} d={500} className="absolute left-0 right-0 text-center" style={{ top: 520 }}>
-          <span className="text-[26px] font-semibold uppercase tracking-[0.4em] text-[var(--text-dim)]">
-            Press <span className="pink-text">N</span> to add a match
-          </span>
-        </Reveal>
-      )}
-
       {matches.map((m, i) => {
         const col = i % cols;
         const row = Math.floor(i / cols);
@@ -155,6 +164,7 @@ export default function MatchesScreen({ on, active, state, dispatch, onOpen }: P
             <Card
               match={m}
               game={state.game}
+              next={m.id === nextId}
               compact={cardH < 150}
               armed={armed === m.id}
               onEnter={() => (hover.current = m.id)}
@@ -166,7 +176,7 @@ export default function MatchesScreen({ on, active, state, dispatch, onOpen }: P
       })}
 
       <Reveal on={on} d={900} className="absolute left-0 right-0 text-center text-[13px] uppercase tracking-[0.4em] text-[var(--text-dim)] opacity-70" style={{ top: Y1 - 40 }}>
-        N new match · click a match to open · hover + Delete twice to remove · Z back to the games
+        Click a match to open · hover a slot + N to set its teams · hover + Delete twice to clear · Tab leaderboard · Z back
       </Reveal>
 
       {picking && (
@@ -188,10 +198,11 @@ const STATUS = {
 } as const;
 
 function Card({
-  match, game, compact, armed, onEnter, onLeave, onOpen,
+  match, game, next, compact, armed, onEnter, onLeave, onOpen,
 }: {
   match: Match;
   game: GameKind;
+  next: boolean;
   compact: boolean;
   armed: boolean;
   onEnter: () => void;
@@ -209,33 +220,50 @@ function Card({
   const nameCls = (i: number) =>
     lead === -1 ? "text-[var(--text)]" : lead === i ? "neon-text" : "text-[var(--text-dim)] opacity-70";
 
+  const empty = !!match.empty;
+  const done = status === "done";
   return (
     <button
       ref={ref}
       data-match={match.id}
       onPointerEnter={onEnter}
       onPointerLeave={onLeave}
-      onClick={() => ref.current && onOpen(ref.current)}
-      className="group relative block h-full w-full cursor-pointer text-left transition-transform duration-200 hover:scale-[1.03] focus-visible:outline-none"
+      onClick={() => {
+        if (empty) return sfx.pointDown(); // no teams yet
+        if (ref.current) onOpen(ref.current);
+      }}
+      className={`group relative block h-full w-full cursor-pointer text-left transition-[transform,opacity,filter] duration-300 focus-visible:outline-none ${
+        next ? "next-match z-10" : "hover:scale-[1.03]"
+      } ${done ? "opacity-45 grayscale-[70%] hover:opacity-80" : ""} ${empty ? "opacity-60" : ""}`}
     >
-      <HudFrame className="h-full w-full" cut={16} tracer={status === "live"} traceDuration={5}>
+      <HudFrame className="h-full w-full" cut={16} tracer={next || status === "live"} traceDuration={next ? 3.5 : 5}>
         <div className={`flex h-full flex-col justify-center ${compact ? "px-5" : "px-7"}`}>
           <div className="flex items-center justify-between">
             <span className="digits text-[14px] uppercase tracking-[0.35em] text-[var(--text-dim)]">
               Match {String(match.num).padStart(2, "0")}
             </span>
-            <span className={`border px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.3em] ${STATUS[status].cls}`}>
-              {STATUS[status].label}
-            </span>
+            {empty ? (
+              <span className="border border-[var(--neon-dim)] px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.3em] text-[var(--text-dim)]">
+                Set teams
+              </span>
+            ) : next ? (
+              <span className="pink-text blink border border-[var(--pink)] px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.3em]">
+                Next match
+              </span>
+            ) : (
+              <span className={`border px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.3em] ${STATUS[status].cls}`}>
+                {STATUS[status].label}
+              </span>
+            )}
           </div>
           <div
             className={`flex items-center justify-between gap-3 font-[family-name:var(--font-display)] uppercase tracking-[0.08em] ${compact ? "mt-1.5 text-[24px]" : "mt-3 text-[32px]"}`}
           >
-            <span className={`truncate ${nameCls(0)}`}>{a.name}</span>
+            <span className={`truncate ${empty ? "text-[var(--neon-dim)]" : nameCls(0)}`}>{a.name}</span>
             <span className="pink-text shrink-0 text-[0.6em]">VS</span>
-            <span className={`truncate text-right ${nameCls(1)}`}>{b.name}</span>
+            <span className={`truncate text-right ${empty ? "text-[var(--neon-dim)]" : nameCls(1)}`}>{b.name}</span>
           </div>
-          {status === "done" && (
+          {done && (
             <div className={`digits flex justify-between ${compact ? "text-[20px]" : "mt-1 text-[28px]"}`}>
               <span className={nameCls(0)}>{ta}</span>
               <span className={nameCls(1)}>{tb}</span>
@@ -246,7 +274,7 @@ function Card({
         <span className="pointer-events-none absolute inset-0 opacity-0 shadow-[inset_0_0_30px_rgba(41,224,143,0.35)] transition-opacity duration-200 group-hover:opacity-100" />
         {armed && (
           <span className="absolute inset-0 flex items-center justify-center bg-[#1a0610]/85 text-[15px] font-semibold uppercase tracking-[0.3em] text-[var(--cell-red)]">
-            Press Delete again to remove
+            Press Delete again to clear
           </span>
         )}
       </HudFrame>

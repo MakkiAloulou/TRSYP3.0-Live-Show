@@ -1,12 +1,12 @@
 "use client";
 
 import { useRef } from "react";
-import { GAME_INFO, GAMES, slotStatus, type GameKind, type GameState } from "@/lib/game";
+import { GAME_INFO, leagueMatches, MODE_GAMES, slotStatus, type GameKind, type GameState } from "@/lib/game";
 import { DrawPath, framePath, Line, Reveal } from "./Draw";
 import HudFrame from "./HudFrame";
 
-/* Page −1: the three games. Clicking one zooms into its match list. The same
-   pairs play every game in order, and scores carry over game to game. */
+/* The games of the chosen mode (League: Polygame + Garden · Cup: Mine).
+   Clicking one zooms into its match list (or the cup bracket). */
 
 const X0 = 150;
 const X1 = 1770;
@@ -25,7 +25,8 @@ interface Props {
 }
 
 export default function GamesScreen({ on, state, onOpen }: Props) {
-  const left0 = (1920 - (CARD_W * 3 + GAP * 2)) / 2;
+  const games = MODE_GAMES[state.mode];
+  const left0 = (1920 - (CARD_W * games.length + GAP * (games.length - 1))) / 2;
   return (
     <div className="absolute inset-0" aria-hidden={!on}>
       <svg className="pointer-events-none absolute inset-0" width={1920} height={1080}>
@@ -36,20 +37,22 @@ export default function GamesScreen({ on, state, onOpen }: Props) {
       </svg>
 
       <Reveal on={on} d={320} className="absolute left-0 right-0 text-center" style={{ top: Y0 + 26 }}>
-        <div className="text-[15px] font-semibold uppercase tracking-[0.55em] text-[var(--text-dim)]">TRSYP 3.0 · Robotics competition</div>
+        <div className="text-[15px] font-semibold uppercase tracking-[0.55em] text-[var(--text-dim)]">TRSYP 3.0 · {state.mode === "cup" ? "Cup game" : "League game"}</div>
         <h1 className="neon-text mt-1 font-[family-name:var(--font-display)] text-[68px] uppercase leading-none tracking-[0.22em]">
-          Games
+          {state.mode === "cup" ? "Cup" : "League"}
         </h1>
       </Reveal>
 
-      {GAMES.map((g, i) => (
+      {games.map((g, i) => (
         <Reveal key={g} on={on} d={520 + i * 140} className="absolute" style={{ left: left0 + i * (CARD_W + GAP), top: 300, width: CARD_W, height: CARD_H }}>
           <GameCard game={g} state={state} onOpen={onOpen} />
         </Reveal>
       ))}
 
       <Reveal on={on} d={1000} className="absolute left-0 right-0 text-center text-[13px] uppercase tracking-[0.4em] text-[var(--text-dim)] opacity-70" style={{ top: Y1 - 40 }}>
-        Click a game to open its matches · scores carry over from one game to the next · Z goes back a level
+        {state.mode === "cup"
+          ? "Click Mine to open the cup bracket · Tab leaderboard · Z goes back a level"
+          : "Click a game to open its matches · scores carry over from Polygame to Garden · Tab leaderboard · Z goes back a level"}
       </Reveal>
     </div>
   );
@@ -58,8 +61,9 @@ export default function GamesScreen({ on, state, onOpen }: Props) {
 function GameCard({ game, state, onOpen }: { game: GameKind; state: GameState; onOpen: Props["onOpen"] }) {
   const ref = useRef<HTMLButtonElement>(null);
   const info = GAME_INFO[game];
-  const done = state.matches.filter((m) => slotStatus(m.games[game]) === "done").length;
-  const live = state.matches.some((m) => slotStatus(m.games[game]) === "live");
+  const list = game === "game3" ? state.matches.filter((m) => m.cup) : leagueMatches(state);
+  const done = list.filter((m) => slotStatus(m.games[game]) === "done").length;
+  const live = list.some((m) => slotStatus(m.games[game]) === "live");
   return (
     <button
       ref={ref}
@@ -76,7 +80,7 @@ function GameCard({ game, state, onOpen }: { game: GameKind; state: GameState; o
             {info.title}
           </span>
           <span className="mt-8 text-[15px] font-semibold uppercase tracking-[0.35em] text-[var(--text-dim)]">
-            {info.ready ? `${done} / ${state.matches.length} matches done` : "Coming soon"}
+            {info.ready ? `${done} / ${game === "game3" ? 3 : list.length} matches done` : "Coming soon"}
           </span>
           {live && (
             <span className="blink pink-text mt-3 border border-[var(--pink)] px-3 py-0.5 text-[12px] font-semibold uppercase tracking-[0.35em]">

@@ -38,6 +38,8 @@ interface Props {
   active: boolean;
   state: GameState;
   dispatch: (a: Action) => void;
+  /** Tab view: just show the standings, never add this match's points */
+  readOnly?: boolean;
 }
 
 interface Update {
@@ -45,7 +47,7 @@ interface Update {
   prevRank: Record<string, number>;
 }
 
-export default function LeaderboardScreen({ on, active, state, dispatch }: Props) {
+export default function LeaderboardScreen({ on, active, state, dispatch, readOnly }: Props) {
   const { league } = state;
   const [update, setUpdate] = useState<Update | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
@@ -65,7 +67,7 @@ export default function LeaderboardScreen({ on, active, state, dispatch }: Props
     }
     const t = setTimeout(() => {
       const { state: s, dispatch: d } = live.current;
-      if (!needsLeagueUpdate(s)) return;
+      if (readOnly || !needsLeagueUpdate(s)) return;
       const gains = pendingGains(s);
       const prevRank = Object.fromEntries(s.league.map((l, i) => [l.id, i]));
       setUpdate({ gains, prevRank });
@@ -81,6 +83,7 @@ export default function LeaderboardScreen({ on, active, state, dispatch }: Props
       if (moves.some((m) => m < 0)) sfx.rankDown((MOVE_MS + 650) / 1000);
     }, UPDATE_AFTER_MS);
     return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [on]);
 
   // hover a points cell and type
@@ -98,7 +101,7 @@ export default function LeaderboardScreen({ on, active, state, dispatch }: Props
     return () => window.removeEventListener("keydown", down);
   }, []);
 
-  const playing = new Set(Object.keys(matchGains(state)));
+  const playing = new Set(readOnly ? [] : Object.keys(matchGains(state)));
 
   return (
     <div className="absolute inset-0" aria-hidden={!on}>
@@ -232,7 +235,7 @@ export default function LeaderboardScreen({ on, active, state, dispatch }: Props
         );
       })}
 
-      {needsLeagueUpdate(state) && on && (
+      {!readOnly && needsLeagueUpdate(state) && on && (
         <Reveal on={on} d={1300} className="absolute left-0 right-0 text-center text-[13px] uppercase tracking-[0.4em] text-[var(--text-dim)]" style={{ top: Y1 - 34 }}>
           Updating with this match…
         </Reveal>

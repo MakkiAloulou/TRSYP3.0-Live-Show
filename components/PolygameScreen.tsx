@@ -1,21 +1,23 @@
 "use client";
 
 import { useEffect, useReducer, useRef, useState } from "react";
-import { cumulative, GAME_INFO, initialState, reducer, slotCarry, teamTotal, type GameKind, type GameState } from "@/lib/game";
+import { cumulative, GAME_INFO, initialState, reducer, slotCarry, teamTotal, type GameKind, type GameState, type Mode } from "@/lib/game";
 import { isMuted, onMuteChange, setMuted, sfx } from "@/lib/sfx";
 import HudFrame from "./HudFrame";
 import ParticleField from "./ParticleField";
 import ScanBar, { SCAN_W } from "./ScanBar";
 import FinalScreen from "./FinalScreen";
 import LeaderboardScreen from "./LeaderboardScreen";
+import BracketScreen from "./BracketScreen";
 import GamesScreen from "./GamesScreen";
+import ModesScreen from "./ModesScreen";
 import MatchesScreen from "./MatchesScreen";
 import StatsScreen from "./StatsScreen";
 import TeamPanel from "./TeamPanel";
 
 const STAGE_W = 1920;
 const STAGE_H = 1080;
-const STORAGE_KEY = "trsyp3-polygame-v6"; // v6: games (page −1) + Garden
+const STORAGE_KEY = "trsyp3-polygame-v7"; // v7: league / cup modes, 9 league slots, cup bracket
 
 /* Keyboard map by the letter printed on the key (works on AZERTY and QWERTY;
    caps lock / Shift don't matter). Shift + points key = ±5. */
@@ -33,7 +35,7 @@ const KEYS = {
 const VIEWS = ["game", "stats", "final", "board"] as const;
 /** Which screens each game walks through with →. Layer 1 is Phase Stats for Polygame,
     and the Game Stats details table for Garden / Mine. */
-const SEQ: Record<GameKind, number[]> = { polygame: [0, 1, 2, 3], garden: [0, 1, 2, 3], game3: [0, 1, 2, 3] };
+const SEQ: Record<GameKind, number[]> = { polygame: [0, 1, 2, 3], garden: [0, 1, 2, 3], game3: [0, 1, 2] };
 
 const WIPE_MS = 820;
 const easeInOut = (p: number) => (p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2);
@@ -125,7 +127,15 @@ export default function PolygameScreen() {
     const i = viewRef.current;
     const seq = SEQ[stateRef.current.game];
     const next = seq[seq.indexOf(i) + 1];
-    if (busy.current || next === undefined) return;
+    if (busy.current) return;
+    if (next === undefined) {
+      // Cup: after Game Stats the match is done → back to the bracket, winner moves on
+      if (stateRef.current.mode === "cup" && i === 2) {
+        dispatch({ type: "finishCupMatch" });
+        void listNav.current.backToList();
+      }
+      return;
+    }
     busy.current = true;
     viewRef.current = next;
     setViewIdx(next);
@@ -169,7 +179,33 @@ export default function PolygameScreen() {
   const listOpenRef = useRef(true);
   // page −1 (games) sits above the match list
   const [gamesOpen, setGamesOpen] = useState(true);
-  const [gamesOn, setGamesOn] = useState(true);
+  const [gamesOn, setGamesOn] = useState(false);
+  // page −1 (League / Cup) sits above the games page
+  const [modesOpen, setModesOpen] = useState(true);
+  const [modesOn, setModesOn] = useState(true);
+  const modesOpenRef = useRef(true);
+  const modesRef = useRef<HTMLDivElement>(null);
+  // Tab: the full league leaderboard over any screen
+  const [boardOpen, setBoardOpen] = useState(false);
+  const [boardOn, setBoardOn] = useState(false);
+  const boardOpenRef = useRef(false);
+  const toggleBoard = (open: boolean) => {
+    if (open === boardOpenRef.current) return;
+    boardOpenRef.current = open;
+    if (open) {
+      setBoardOpen(true);
+      sfx.zoomIn();
+      setTimeout(() => {
+        setBoardOn(true);
+        sfx.scribble(1.2, 0.05);
+        sfx.countTicks(1.2, 0.8);
+      }, 120);
+    } else {
+      sfx.zoomOut();
+      setBoardOn(false);
+      setTimeout(() => setBoardOpen(false), 380);
+    }
+  };
   const gamesOpenRef = useRef(true);
   const gamesRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -266,7 +302,7 @@ export default function PolygameScreen() {
   };
   /** Page −1 → a game's match list (zoom into the game card). */
   const openGame = async (game: GameKind, card: HTMLElement) => {
-    if (busy.current || !gamesOpenRef.current) return;
+    if (busy.current || !gamesOpenRef.current || modesOpenRef.current) return;
     busy.current = true;
     const from = toStage(card);
     setZoomLabel(`Game ${String(GAME_INFO[game].num).padStart(2, "0")} · ${GAME_INFO[game].title}`);
@@ -312,9 +348,57 @@ export default function PolygameScreen() {
     busy.current = false;
   };
 
-  const listNav = useRef({ openMatch, backToList, openGame, backToGames });
+  /** Page −1 (League / Cup) → that mode's games (zoom into the card). */
+  const openMode = async (mode: Mode, card: HTMLElement) => {
+    if (busy.current || !modesOpenRef.current) return;
+    busy.current = true;
+    const from = toStage(card);
+    setZoomLabel(mode === "cup" ? "Cup game" : "League game");
+    dispatch({ type: "selectMode", mode });
+    sfx.zoomIn();
+    await tween(ZOOM_MS, (p) => {
+      const q = easeInOut(p);
+      placeZoom({ x: lerp(from.x, 0, q), y: lerp(from.y, 0, q), w: lerp(from.w, STAGE_W, q), h: lerp(from.h, STAGE_H, q) }, 1);
+      placeList(1 - q, 1 + 0.25 * q, from, modesRef.current);
+    });
+    modesOpenRef.current = false;
+    setModesOpen(false);
+    setModesOn(false);
+    setGamesOn(true);
+    sfx.scribble(1.2, 0.05);
+    await tween(260, (p) => placeZoom(FULL, 1 - p));
+    hideZoom();
+    busy.current = false;
+  };
+
+  /** Games page → page −1 (shrink back into the League / Cup card). */
+  const backToModes = async () => {
+    if (busy.current || modesOpenRef.current || !gamesOpenRef.current) return;
+    busy.current = true;
+    const mode = stateRef.current.mode;
+    const card = modesRef.current?.querySelector<HTMLElement>(`[data-mode="${mode}"]`);
+    const to: Rect = card ? toStage(card) : { x: STAGE_W / 2 - 310, y: 300, w: 620, h: 560 };
+    setZoomLabel(mode === "cup" ? "Cup game" : "League game");
+    sfx.zoomOut();
+    await tween(200, (p) => placeZoom(FULL, p));
+    modesOpenRef.current = true;
+    setModesOpen(true);
+    setModesOn(true);
+    setGamesOn(false);
+    await tween(ZOOM_MS, (p) => {
+      const q = easeInOut(p);
+      placeZoom({ x: lerp(0, to.x, q), y: lerp(0, to.y, q), w: lerp(STAGE_W, to.w, q), h: lerp(STAGE_H, to.h, q) }, 1);
+      placeList(q, 1.25 - 0.25 * q, to, modesRef.current);
+    });
+    placeList(1, 1, to, modesRef.current);
+    await tween(220, (p) => placeZoom(to, 1 - p));
+    hideZoom();
+    busy.current = false;
+  };
+
+  const listNav = useRef({ openMatch, backToList, openGame, backToGames, openMode, backToModes, toggleBoard });
   useEffect(() => {
-    listNav.current = { openMatch, backToList, openGame, backToGames };
+    listNav.current = { openMatch, backToList, openGame, backToGames, openMode, backToModes, toggleBoard };
   });
 
   // A press during a transition is remembered and played right after it
@@ -363,6 +447,18 @@ export default function PolygameScreen() {
       if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
       const now = Date.now();
 
+      // Tab: league leaderboard over any screen (Tab / Esc closes)
+      if (e.key === "Tab") {
+        e.preventDefault();
+        listNav.current.toggleBoard(!boardOpenRef.current);
+        return;
+      }
+      if (boardOpenRef.current) {
+        if (e.key === "Escape") listNav.current.toggleBoard(false);
+        else if (e.key.toLowerCase() === "m") setMuted(!isMuted());
+        return; // nothing else reacts while the leaderboard is up
+      }
+
       if (e.key === "ArrowRight" && !listOpenRef.current) {
         e.preventDefault();
         if (busy.current) queued.current = "next";
@@ -383,11 +479,12 @@ export default function PolygameScreen() {
         setMuted(!isMuted());
         return;
       }
-      // Z goes up one level: match → match list → games
+      // Z goes up one level: match → match list / bracket → games → League / Cup
       if (e.key.toLowerCase() === "z") {
         e.preventDefault();
         if (!listOpenRef.current) void listNav.current.backToList();
         else if (!gamesOpenRef.current) void listNav.current.backToGames();
+        else if (!modesOpenRef.current) void listNav.current.backToModes();
         return;
       }
       // the games page / match list handle their own keys (N, 1–9, Delete)
@@ -558,16 +655,26 @@ export default function PolygameScreen() {
           className={`absolute inset-0 z-[35] bg-[var(--bg)] ${listOpen ? "" : "pointer-events-none invisible"}`}
         >
           <ParticleField />
-          <MatchesScreen
-            on={listOn}
-            active={listOpen && !gamesOpen}
-            state={state}
-            dispatch={dispatch}
-            onOpen={(id, el) => void listNav.current.openMatch(id, el)}
-          />
+          {state.mode === "cup" ? (
+            <BracketScreen
+              on={listOn}
+              active={listOpen && !gamesOpen && !boardOpen}
+              state={state}
+              dispatch={dispatch}
+              onOpen={(id, el) => void listNav.current.openMatch(id, el)}
+            />
+          ) : (
+            <MatchesScreen
+              on={listOn}
+              active={listOpen && !gamesOpen && !boardOpen}
+              state={state}
+              dispatch={dispatch}
+              onOpen={(id, el) => void listNav.current.openMatch(id, el)}
+            />
+          )}
         </div>
 
-        {/* Page −1: the three games (opaque, on top while open) */}
+        {/* The games of the chosen mode (opaque, on top while open) */}
         <div
           ref={gamesRef}
           inert={!gamesOpen}
@@ -576,6 +683,27 @@ export default function PolygameScreen() {
           <ParticleField />
           <GamesScreen on={gamesOn} state={state} onOpen={(g, el) => void listNav.current.openGame(g, el)} />
         </div>
+
+        {/* Page −1: League game / Cup game (opaque, top of the stack while open) */}
+        <div
+          ref={modesRef}
+          inert={!modesOpen}
+          className={`absolute inset-0 z-[37] bg-[var(--bg)] ${modesOpen ? "" : "pointer-events-none invisible"}`}
+        >
+          <ParticleField />
+          <ModesScreen on={modesOn} state={state} onOpen={(m, el) => void listNav.current.openMode(m, el)} />
+        </div>
+
+        {/* Tab: the league leaderboard over everything (read-only, never adds points) */}
+        {boardOpen && (
+          <div
+            className="absolute inset-0 z-[45] bg-[var(--bg)] transition-[opacity,transform] duration-300 ease-out"
+            style={{ opacity: boardOn ? 1 : 0, transform: boardOn ? "scale(1)" : "scale(1.04)" }}
+          >
+            <ParticleField />
+            <LeaderboardScreen on={boardOn} active={false} readOnly state={state} dispatch={dispatch} />
+          </div>
+        )}
 
         {/* the card that grows into a full screen (and shrinks back) */}
         <div
@@ -645,6 +773,7 @@ function HelpOverlay({ onClose }: { onClose: () => void }) {
             <li>Polygame: <Kbd>R</Kbd> / <Kbd>U</Kbd> pin or unpin team 1 / team 2 (or click the PINNED badge to remove it)</li>
             <li>Garden: click the chances number (right click gives one back) or <Kbd>E</Kbd>/<Kbd>D</Kbd> team 1, <Kbd>I</Kbd>/<Kbd>J</Kbd> team 2 · <Kbd>Shift</Kbd>+<Kbd>1–9</Kbd> starting chances</li>
             <li>Matches screen: <Kbd>N</Kbd> new match (then 1–9 twice) · click a card to open · hover + <Kbd>Del</Kbd> twice to remove · <Kbd>Z</Kbd> back to the list from any screen</li>
+            <li><Kbd>Tab</Kbd> league leaderboard from any screen (Tab / Esc closes) · Cup bracket: <Kbd>D</Kbd> draw, <Kbd>Shift</Kbd>+<Kbd>D</Kbd> twice reset</li>
             <li><Kbd>→</Kbd> next screen (Polygame → Phase Stats → Game Stats → Leaderboard) · <Kbd>←</Kbd> back</li>
             <li>Leaderboard: hover points and type · double-click a name to rename</li>
             <li>Phase Stats: hover any value and type (digits : . % -) · <Kbd>Backspace</Kbd> / <Kbd>Del</Kbd></li>

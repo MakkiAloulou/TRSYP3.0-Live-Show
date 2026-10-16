@@ -87,7 +87,21 @@ export interface Match {
   id: string;
   num: number;
   games: Record<GameKind, GameSlot>;
+  /** League slot whose two teams haven't been chosen yet */
+  empty?: boolean;
+  /** Cup bracket position (cup matches only) */
+  cup?: CupRound;
+  /** Cup tie-break: the team picked by hand to go through */
+  pick?: TeamId;
 }
+
+/* League = Polygame + Garden over 9 match slots; Cup = Mine, a 4-team bracket. */
+export type Mode = "league" | "cup";
+export const MODE_GAMES: Record<Mode, GameKind[]> = { league: ["polygame", "garden"], cup: ["game3"] };
+export type CupRound = "sf1" | "sf2" | "final";
+export const CUP_ROUNDS: CupRound[] = ["sf1", "sf2", "final"];
+export const cupId = (r: CupRound) => `cup-${r}`;
+export const LEAGUE_SLOTS = 9;
 export type MatchStatus = "upcoming" | "live" | "done";
 export const slotStatus = (g: GameSlot): MatchStatus => (g.committed ? "done" : g.opened ? "live" : "upcoming");
 
@@ -105,6 +119,8 @@ export interface GameState {
   current: string | null;
   /** which game screen 0 and the open match are on */
   game: GameKind;
+  /** League or Cup (page −1) */
+  mode: Mode;
   /** Garden: starting chances for every match */
   gardenChances: number;
 }
@@ -126,6 +142,13 @@ export type Action =
   | { type: "addMatch"; a: string; b: string }
   | { type: "deleteMatch"; id: string }
   | { type: "openMatch"; id: string }
+  | { type: "selectMode"; mode: Mode }
+  | { type: "setPair"; id: string; a: string; b: string }
+  | { type: "clearMatch"; id: string }
+  | { type: "cupDraw"; order: string[] }
+  | { type: "cupReset" }
+  | { type: "finishCupMatch" }
+  | { type: "cupPick"; id: string; team: TeamId }
   | { type: "selectGame"; game: GameKind }
   | { type: "useChance"; team: TeamId; delta: number }
   | { type: "togglePin"; team: TeamId }
@@ -238,7 +261,10 @@ const normSlot = (g: GameSlot): GameSlot => ({
 });
 
 const freshSlot = (league: LeagueTeam[], a: string, b: string, chances: number): GameSlot => {
-  const team = (tid: string) => ({ ...freshTeam(league.find((l) => l.id === tid)?.name ?? "?"), leagueId: tid, chances });
+  const team = (tid: string) =>
+    tid
+      ? { ...freshTeam(league.find((l) => l.id === tid)?.name ?? "?"), leagueId: tid, chances }
+      : { ...freshTeam("TBD"), chances };
   return { teams: [team(a), team(b)], opened: false, committed: false, applied: {} };
 };
 
@@ -252,6 +278,18 @@ const newMatch = (league: LeagueTeam[], id: string, num: number, a: string, b: s
   },
 });
 
+/** A league slot with no teams yet */
+const emptyMatch = (league: LeagueTeam[], id: string, num: number, chances: number): Match => ({
+  ...newMatch(league, id, num, "", "", chances),
+  empty: true,
+});
+
+/** The 9 league slots (fixed ids m1…m9 so server and client render the same) */
+const leagueSlots = (league: LeagueTeam[], chances: number): Match[] =>
+  Array.from({ length: LEAGUE_SLOTS }, (_, i) =>
+    i === 0 ? newMatch(league, "m1", 1, "t6", "t7", chances) : emptyMatch(league, `m${i + 1}`, i + 1, chances),
+  );
+
 export const normalizeState = (s: GameState): GameState => {
   const league = Array.isArray(s.league) && s.league.length ? s.league : freshLeague();
   const chances = s.gardenChances ?? 3;
@@ -263,6 +301,9 @@ export const normalizeState = (s: GameState): GameState => {
     return {
       id: m.id,
       num: m.num,
+      empty: m.empty,
+      cup: m.cup,
+      pick: m.pick,
       games: Object.fromEntries(GAMES.map((g) => [g, games[g] ? normSlot(games[g]) : base.games[g]])) as Match["games"],
     };
   });
@@ -274,25 +315,57 @@ export const normalizeState = (s: GameState): GameState => {
     matches,
     current: s.current ?? null,
     game: s.game ?? "polygame",
+    mode: s.mode ?? "league",
     gardenChances: chances,
   };
 };
 
 export const initialState = (): GameState => {
   const league = freshLeague();
-  // one starter match so screen 0 isn't empty
-  const first = newMatch(league, "m1", 1, "t6", "t7", 3); // fixed id: same on server and client
+  const matches = leagueSlots(league, 3); // match 1 = CUBOT vs TEST 2, the rest to be set
   return {
-    teams: first.games.polygame.teams,
+    teams: matches[0].games.polygame.teams,
     league,
     matchCommitted: false,
     applied: {},
-    matches: [first],
+    matches,
     current: null,
     game: "polygame",
+    mode: "league",
     gardenChances: 3,
   };
 };
+
+/* ─── League / cup helpers ─────────────────────────────────────────── */
+
+export const leagueMatches = (s: GameState) => s.matches.filter((m) => !m.cup);
+export const cupMatch = (s: GameState, r: CupRound) => s.matches.find((m) => m.cup === r);
+
+/** The first league slot not yet done in `game` (and with teams) — glows on screen 0. */
+export const nextMatchId = (s: GameState, game: GameKind) =>
+  leagueMatches(s).find((m) => !m.empty && !m.games[game].committed)?.id ?? null;
+
+/** Cup winner of a finished match: higher Mine score, or the hand-picked team on a tie. */
+export const cupWinner = (m: Match | undefined): TeamId | null => {
+  if (!m || m.empty || !m.games.game3.committed) return null;
+  const a = gameScore("game3", m.games.game3.teams[0]);
+  const b = gameScore("game3", m.games.game3.teams[1]);
+  if (a !== b) return a > b ? 0 : 1;
+  return m.pick ?? null;
+};
+export const cupWinnerId = (m: Match | undefined) => {
+  const w = cupWinner(m);
+  return w === null || !m ? null : (m.games.game3.teams[w].leagueId ?? null);
+};
+
+/** Set (or replace) the two teams of a match. Anything it put on the league comes back off. */
+const withPair = (s: GameState, m: Match, a: string, b: string): Match => ({
+  ...newMatch(s.league, m.id, m.num, a, b, s.gardenChances),
+  cup: m.cup,
+  empty: !a || !b ? true : undefined,
+});
+const revertMatch = (league: LeagueTeam[], m: Match) =>
+  GAMES.reduce((l, g) => (m.games[g].committed && !m.cup ? revertApplied(l, m.games[g].applied, true) : l), league);
 
 /** Score a team brings into the current game from the games before it (same match). */
 export const carriedIn = (s: GameState, team: TeamId): number => {
@@ -331,7 +404,7 @@ const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().t
 /** Points each league team would gain from the current match (by matching team names). */
 export const matchGains = (s: GameState): Record<string, number> => {
   const gains: Record<string, number> = {};
-  if (!s.current) return gains;
+  if (!s.current || s.matches.find((m) => m.id === s.current)?.cup) return gains; // cup points stay out of the league
   for (const t of s.teams) {
     const lt = s.league.find((l) => (t.leagueId ? l.id === t.leagueId : sameName(l.name, t.name)));
     if (lt) gains[lt.id] = (gains[lt.id] ?? 0) + gameScore(s.game, t);
@@ -398,6 +471,17 @@ const updateCell = (s: GameState, team: TeamId, index: number, fn: (c: GridCell)
     grid[index] = fn(toCell(grid[index]));
     return { ...t, grid };
   });
+
+/** Put the two semi-final winners into the final (only until the final is opened). */
+function fillFinal(s: GameState): GameState {
+  const fin = cupMatch(s, "final");
+  if (!fin || fin.games.game3.opened) return s;
+  const a = cupWinnerId(cupMatch(s, "sf1"));
+  const b = cupWinnerId(cupMatch(s, "sf2"));
+  const cur = fin.games.game3.teams.map((t) => t.leagueId ?? "");
+  if (cur[0] === (a ?? "") && cur[1] === (b ?? "")) return s;
+  return { ...s, matches: s.matches.map((m) => (m.id === fin.id ? withPair(s, fin, a ?? "", b ?? "") : m)) };
+}
 
 /** Every change to the open match is mirrored into its entry in `matches`. */
 export function reducer(s: GameState, a: Action): GameState {
@@ -515,9 +599,64 @@ function baseReducer(s: GameState, a: Action): GameState {
         current: s.current === a.id ? null : s.current,
       };
     }
-    case "openMatch": {
+    case "selectMode":
+      return { ...s, mode: a.mode, game: MODE_GAMES[a.mode][0], current: null };
+    case "setPair": {
+      const m = s.matches.find((x) => x.id === a.id);
+      if (!m || a.a === a.b) return s;
+      return {
+        ...s,
+        league: sortLeague(revertMatch(s.league, m)),
+        matches: s.matches.map((x) => (x.id === m.id ? withPair(s, m, a.a, a.b) : x)),
+        current: s.current === m.id ? null : s.current,
+      };
+    }
+    case "clearMatch": {
       const m = s.matches.find((x) => x.id === a.id);
       if (!m) return s;
+      return {
+        ...s,
+        league: sortLeague(revertMatch(s.league, m)),
+        matches: s.matches.map((x) => (x.id === m.id ? withPair(s, m, "", "") : x)),
+        current: s.current === m.id ? null : s.current,
+      };
+    }
+    case "cupDraw": {
+      // a.order = 4 league ids: semi-final 1 gets [0, 1], semi-final 2 gets [2, 3]
+      if (CUP_ROUNDS.some((r) => cupMatch(s, r)?.games.game3.opened)) return s; // locked once played
+      const [p, q, r2, t] = a.order;
+      const mk = (r: CupRound, x: string, y: string, num: number): Match => ({
+        ...newMatch(s.league, cupId(r), num, x, y, s.gardenChances),
+        cup: r,
+        empty: !x || !y ? true : undefined,
+      });
+      return {
+        ...s,
+        matches: [...leagueMatches(s), mk("sf1", p, q, 101), mk("sf2", r2, t, 102), mk("final", "", "", 103)],
+        current: s.current?.startsWith("cup-") ? null : s.current,
+      };
+    }
+    case "cupReset":
+      return { ...s, matches: leagueMatches(s), current: s.current?.startsWith("cup-") ? null : s.current };
+    case "finishCupMatch": {
+      // leaving a cup match's Game Stats: mark it played, then fill the final once both semis have a winner
+      if (!s.current?.startsWith("cup-")) return s;
+      let n: GameState = { ...s, matchCommitted: true };
+      n = {
+        ...n,
+        matches: n.matches.map((m) =>
+          m.id === s.current ? { ...m, games: { ...m.games, game3: { ...m.games.game3, teams: s.teams, committed: true } } } : m,
+        ),
+      };
+      return fillFinal(n);
+    }
+    case "cupPick": {
+      const n = { ...s, matches: s.matches.map((m) => (m.id === a.id ? { ...m, pick: a.team } : m)) };
+      return fillFinal(n);
+    }
+    case "openMatch": {
+      const m = s.matches.find((x) => x.id === a.id);
+      if (!m || m.empty) return s;
       const slot = m.games[s.game];
       // names follow the league (in case a team was renamed there)
       const named = slot.teams.map((t) => ({

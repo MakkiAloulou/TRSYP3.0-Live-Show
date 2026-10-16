@@ -195,3 +195,15 @@ body {
     animation-iteration-count: 1 !important;
   }
 }
+
+/* ─── League: the next match to play breathes ──────────────────────── */
+@keyframes next-glow {
+  0%, 100% { transform: scale(1.06); filter: brightness(1.05); }
+  50% { transform: scale(1.09); filter: brightness(1.35); }
+}
+.next-match {
+  animation: next-glow 1.8s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .next-match { animation: none; transform: scale(1.06); }
+}
