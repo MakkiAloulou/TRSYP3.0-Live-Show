@@ -20,14 +20,16 @@ export default function ShapesBoard({ shapes, onChange }: Props) {
       aria-label="Polygame shapes"
     >
       {SHAPES.map((s) => {
-        const st = shapes[s.id];
+        const st = shapes[s.id] ?? "normal"; // older saves don't have the bottom row
         const removed = st === "removed";
+        const cx = s.points.reduce((t, p) => t + p[0], 0) / s.points.length;
+        const cy = s.points.reduce((t, p) => t + p[1], 0) / s.points.length;
         return (
+          <g key={s.id}>
           <polygon
-            key={s.id}
             points={s.points.map((p) => p.join(",")).join(" ")}
             role="button"
-            aria-label={`${s.label}: ${st}`}
+            aria-label={`${s.num ? `${s.num}. ` : ""}${s.label}: ${st}`}
             onClick={() => onChange(s.id, removed ? "normal" : "removed")}
             onContextMenu={(e) => {
               e.preventDefault();
@@ -40,6 +42,24 @@ export default function ShapesBoard({ shapes, onChange }: Props) {
             strokeLinejoin="round"
             className="cursor-pointer transition-[fill,opacity] duration-200 hover:opacity-85"
           />
+          {s.num && (
+          <text
+            x={cx}
+            y={cy}
+            textAnchor="middle"
+            dominantBaseline="central"
+            pointerEvents="none"
+            className="select-none font-[family-name:var(--font-digits)]"
+            fontSize={s.kind.endsWith("cube") ? 17 : 14}
+            fill={removed ? "rgba(230,255,243,0.45)" : "#fff"}
+            stroke={removed ? "none" : "rgba(10,6,24,0.55)"}
+            strokeWidth={3}
+            paintOrder="stroke"
+          >
+            {s.num}
+          </text>
+          )}
+          </g>
         );
       })}
     </svg>

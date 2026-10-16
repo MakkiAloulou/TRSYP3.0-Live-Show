@@ -37,14 +37,22 @@ export type Action =
   | { type: "load"; state: GameState };
 
 /* ─── Shapes geometry (flat top view) ─────────────────────────────────
-   5 columns; each column = 1 green triangle, 1 red + 1 blue triangle,
-   1 red + 1 blue cube. 25 pieces total. A shear makes the band lean
-   like the physical board. */
+   5 columns; each column = 1 green triangle on top, a red and a blue
+   triangle on top, a red and a blue cube, and a red and a blue triangle
+   underneath. 35 pieces total. A shear makes the band lean like the
+   physical board.
+
+   Numbering zigzags through each column (6 per column):
+   red top 1 → red cube 2 → blue bottom 3 → blue top 4 → blue cube 5 →
+   red bottom 6, then column 2 is 7–12, … up to 30. Green triangles
+   are not numbered. */
 
 export type ShapeKind = "green" | "red-tri" | "blue-tri" | "red-cube" | "blue-cube";
 
 export interface ShapeDef {
   id: string;
+  /** Shape number shown on the board; green triangles have none */
+  num: number | null;
   kind: ShapeKind;
   label: string;
   points: [number, number][];
@@ -66,21 +74,26 @@ const SHEAR = 0.32;
 const shear = (pts: [number, number][]): [number, number][] =>
   pts.map(([x, y]) => [x + y * SHEAR, y]);
 
-export const BOARD_W = COL_W * 5 + (TRI_H + CUBE_H) * SHEAR;
-export const BOARD_H = TRI_H + CUBE_H;
+export const BOARD_W = COL_W * 5 + (TRI_H * 2 + CUBE_H) * SHEAR;
+export const BOARD_H = TRI_H * 2 + CUBE_H;
 
 export const SHAPES: ShapeDef[] = Array.from({ length: 5 }, (_, c) => {
   const x = c * COL_W;
+  const r = x + COL_W;
   const m = x + COL_W / 2;
   const y1 = TRI_H;
   const y2 = TRI_H + CUBE_H;
+  const y3 = TRI_H * 2 + CUBE_H;
   const n = c + 1;
+  const b = c * 6;
   return [
-    { id: `g${n}`, kind: "green", label: `Green triangle ${n}`, points: shear([[x, 0], [x + COL_W, 0], [m, y1]]) },
-    { id: `rt${n}`, kind: "red-tri", label: `Red triangle ${n}`, points: shear([[x, 0], [m, y1], [x, y1]]) },
-    { id: `bt${n}`, kind: "blue-tri", label: `Blue triangle ${n}`, points: shear([[x + COL_W, 0], [x + COL_W, y1], [m, y1]]) },
-    { id: `rc${n}`, kind: "red-cube", label: `Red cube ${n}`, points: shear([[x, y1], [m, y1], [m, y2], [x, y2]]) },
-    { id: `bc${n}`, kind: "blue-cube", label: `Blue cube ${n}`, points: shear([[m, y1], [x + COL_W, y1], [x + COL_W, y2], [m, y2]]) },
+    { id: `rt${n}`, num: b + 1, kind: "red-tri", label: `Red top triangle ${n}`, points: shear([[x, 0], [m, y1], [x, y1]]) },
+    { id: `rc${n}`, num: b + 2, kind: "red-cube", label: `Red cube ${n}`, points: shear([[x, y1], [m, y1], [m, y2], [x, y2]]) },
+    { id: `bb${n}`, num: b + 3, kind: "blue-tri", label: `Blue bottom triangle ${n}`, points: shear([[m, y2], [r, y2], [r, y3]]) },
+    { id: `bt${n}`, num: b + 4, kind: "blue-tri", label: `Blue top triangle ${n}`, points: shear([[r, 0], [r, y1], [m, y1]]) },
+    { id: `bc${n}`, num: b + 5, kind: "blue-cube", label: `Blue cube ${n}`, points: shear([[m, y1], [r, y1], [r, y2], [m, y2]]) },
+    { id: `rb${n}`, num: b + 6, kind: "red-tri", label: `Red bottom triangle ${n}`, points: shear([[x, y2], [m, y2], [x, y3]]) },
+    { id: `g${n}`, num: null, kind: "green", label: `Green triangle ${n}`, points: shear([[x, 0], [r, 0], [m, y1]]) },
   ] satisfies ShapeDef[];
 }).flat();
 
