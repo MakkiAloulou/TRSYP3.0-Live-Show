@@ -64,8 +64,7 @@ export type Action =
 /* ─── Shapes geometry (flat top view) ─────────────────────────────────
    5 columns; each column = 1 green triangle on top, a red and a blue
    triangle on top, a red and a blue cube, and a red and a blue triangle
-   underneath. 35 pieces total. A shear makes the band lean like the
-   physical board.
+   underneath. 35 pieces total.
 
    Numbering zigzags through each column (6 per column):
    red top 1 → red cube 2 → blue bottom 3 → blue top 4 → blue cube 5 →
@@ -92,9 +91,9 @@ export const SHAPE_COLORS: Record<ShapeKind, string> = {
 };
 
 const COL_W = 100;
-const TRI_H = 64;
-const CUBE_H = 76;
-const SHEAR = 0.32;
+const TRI_H = 56;
+const CUBE_H = COL_W / 2; // cubes are true squares (top view), like the grid cells
+const SHEAR = 0; // no lean, so squares stay square
 
 const shear = (pts: [number, number][]): [number, number][] =>
   pts.map(([x, y]) => [x + y * SHEAR, y]);
