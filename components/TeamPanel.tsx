@@ -72,7 +72,11 @@ export default function TeamPanel({ id, team, dispatch }: Props) {
           <div className="flex h-full flex-col items-center px-4 pb-4 pt-3">
             <Label>Grid</Label>
             <div className="min-h-0 flex-1 pt-2">
-              <ColorGrid grid={team.grid} onCycle={(i) => dispatch({ type: "cycleCell", team: id, index: i })} />
+              <ColorGrid
+                grid={team.grid}
+                onCell={(i, half) => dispatch({ type: "cycleCell", team: id, index: i, half })}
+                onHalf={(i, half) => dispatch({ type: "cycleHalf", team: id, index: i, half })}
+              />
             </div>
           </div>
         </HudFrame>

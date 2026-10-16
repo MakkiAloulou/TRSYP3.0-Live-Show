@@ -2,6 +2,8 @@
 
 export type ShapeState = "normal" | "grey" | "removed";
 export type GridColor = 0 | 1 | 2; // 0 white, 1 red, 2 blue
+/** A grid square split on its "\" diagonal: [top-right triangle, bottom-left triangle] */
+export type GridCell = [GridColor, GridColor];
 export type TeamId = 0 | 1;
 
 export interface TimerState {
@@ -13,7 +15,7 @@ export interface TimerState {
 export interface TeamState {
   name: string;
   shapes: Record<string, ShapeState>;
-  grid: GridColor[];
+  grid: GridCell[];
   timer: TimerState;
   points: number;
 }
@@ -24,7 +26,8 @@ export interface GameState {
 
 export type Action =
   | { type: "setShape"; team: TeamId; id: string; state: ShapeState }
-  | { type: "cycleCell"; team: TeamId; index: number }
+  | { type: "cycleHalf"; team: TeamId; index: number; half: 0 | 1 }
+  | { type: "cycleCell"; team: TeamId; index: number; half: 0 | 1 }
   | { type: "toggleTimer"; team: TeamId; now: number }
   | { type: "toggleBoth"; now: number }
   | { type: "resetTimer"; team: TeamId }
@@ -88,14 +91,16 @@ const freshTimer = (): TimerState => ({ running: false, startedAt: null, accumul
 const freshTeam = (name: string): TeamState => ({
   name,
   shapes: Object.fromEntries(SHAPES.map((s) => [s.id, "normal" as ShapeState])),
-  grid: Array<GridColor>(25).fill(0),
+  grid: Array.from({ length: 25 }, (): GridCell => [0, 0]),
   timer: freshTimer(),
   points: 0,
 });
 
 export const initialState = (): GameState => ({
-  teams: [freshTeam("TEAM 1"), freshTeam("TEAM 2")],
+  teams: [freshTeam("CUBOT"), freshTeam("TEST 2")],
 });
+
+const nextColor = (c: GridColor) => ((c + 1) % 3) as GridColor;
 
 export const elapsedMs = (t: TimerState, now: number) =>
   t.accumulated + (t.running && t.startedAt !== null ? now - t.startedAt : 0);
@@ -115,10 +120,20 @@ export function reducer(s: GameState, a: Action): GameState {
   switch (a.type) {
     case "setShape":
       return updateTeam(s, a.team, (t) => ({ ...t, shapes: { ...t.shapes, [a.id]: a.state } }));
-    case "cycleCell":
+    case "cycleHalf":
       return updateTeam(s, a.team, (t) => {
         const grid = [...t.grid];
-        grid[a.index] = ((grid[a.index] + 1) % 3) as GridColor;
+        const cell: GridCell = [...grid[a.index]];
+        cell[a.half] = nextColor(cell[a.half]);
+        grid[a.index] = cell;
+        return { ...t, grid };
+      });
+    case "cycleCell":
+      // Whole square: both halves move to the next colour of the half that was clicked
+      return updateTeam(s, a.team, (t) => {
+        const grid = [...t.grid];
+        const c = nextColor(grid[a.index][a.half]);
+        grid[a.index] = [c, c];
         return { ...t, grid };
       });
     case "toggleTimer":

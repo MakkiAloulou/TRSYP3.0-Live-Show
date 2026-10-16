@@ -8,7 +8,7 @@ import TeamPanel from "./TeamPanel";
 
 const STAGE_W = 1920;
 const STAGE_H = 1080;
-const STORAGE_KEY = "trsyp3-polygame-v1";
+const STORAGE_KEY = "trsyp3-polygame-v2";
 
 /* Keyboard map (by physical key, so layout/caps lock don't matter).
    Shift + points key = ±5. */
@@ -37,7 +37,8 @@ export default function PolygameScreen() {
     restored.current = true;
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) dispatch({ type: "load", state: JSON.parse(raw) as GameState });
+      const saved = raw ? (JSON.parse(raw) as GameState) : null;
+      if (saved && Array.isArray(saved.teams?.[0]?.grid?.[0])) dispatch({ type: "load", state: saved });
     } catch {}
   }, []);
 
@@ -95,7 +96,9 @@ export default function PolygameScreen() {
 
   return (
     // overflow-clip (not hidden) so focusing a control can never scroll the stage
-    <main className="fixed inset-0 flex items-center justify-center overflow-clip bg-[var(--bg)]">
+    <main
+      onContextMenu={(e) => e.preventDefault()} // right click is a game control, never the browser menu
+      className="fixed inset-0 flex items-center justify-center overflow-clip bg-[var(--bg)]">
       <div className="relative shrink-0 overflow-clip" style={{ width: STAGE_W * scale, height: STAGE_H * scale }}>
       <div
         className="absolute left-0 top-0 overflow-clip"
@@ -175,7 +178,8 @@ function HelpOverlay({ onClose }: { onClose: () => void }) {
           <ul className="mt-6 space-y-1.5 text-base text-[var(--text-dim)]">
             <li><Kbd>Space</Kbd> start / pause both timers</li>
             <li><Kbd>Shift</Kbd>+<Kbd>X</Kbd> twice — reset everything</li>
-            <li>Click a shape: Grey / Remove / Restore · Click a grid square: white → red → blue</li>
+            <li>Shapes: left click removes / brings back · right click greys / restores</li>
+            <li>Grid: left click colours the whole square · right click colours one triangle (white → red → blue)</li>
             <li>Double-click a team name to rename · <Kbd>H</Kbd> toggles this panel</li>
           </ul>
         </div>
