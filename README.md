@@ -19,6 +19,10 @@ Press `→` on the Polygame screen: a neon scan bar wipes it away, then the stat
 
 Each team shows Time (compared against a fixed 5:00 — green "<" under, red ">" over), Position and Accuracy, each with a bonus typed by hand, Phase 1–3 scores and the **total score** (= Phase 1 + Phase 2 + Phase 3). Everything is typed by hand: hover a value and type (digits `:` `.` `%` `-`). `Backspace` deletes, `Delete` clears. Position shows as 1st / 2nd…, and accuracy gets a `%` automatically.
 
+## Screen 3 — Game Stats
+
+Press `→` again from Phase Stats. Shows each team's **total score** (taken from Phase Stats). 6 seconds after the screen appears, the reveal plays: a line sweeps across, "THE DOMINANT TEAM IS" decodes, and the leading team's name slams in with a shockwave, particle burst and screen shake. The leading score pulses and the other team dims. A tie shows "IT'S A DRAW". `←` goes back one screen.
+
 ### Keyboard
 
 | Action | Team 1 | Team 2 |
@@ -28,7 +32,7 @@ Each team shows Time (compared against a fixed 5:00 — green "<" under, red ">"
 | Points +1 (Shift = +5) | `W` | `O` |
 | Points −1 (Shift = −5) | `S` | `K` |
 
-- `→` / `←` — Phase Stats screen / back to Polygame
+- `→` / `←` — next / previous screen (Polygame → Phase Stats → Game Stats)
 - `Space` — start / pause both timers (Polygame screen)
 - `Shift+X` twice within 2 s — reset everything
 - `H` — show / hide the controls panel

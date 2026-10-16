@@ -5,6 +5,7 @@ import { initialState, reducer, type GameState } from "@/lib/game";
 import HudFrame from "./HudFrame";
 import ParticleField from "./ParticleField";
 import ScanBar, { SCAN_W } from "./ScanBar";
+import FinalScreen from "./FinalScreen";
 import StatsScreen from "./StatsScreen";
 import TeamPanel from "./TeamPanel";
 
@@ -25,7 +26,7 @@ const KEYS = {
   k: { type: "points", team: 1, delta: -1 },
 } as const;
 
-type View = "game" | "stats";
+const VIEWS = ["game", "stats", "final"] as const;
 
 const WIPE_MS = 820;
 const easeInOut = (p: number) => (p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2);
@@ -55,53 +56,63 @@ export default function PolygameScreen() {
   const [help, setHelp] = useState(false);
   const resetArm = useRef(0);
 
-  // Screen switching: → Phase Stats, ← back to Polygame
-  const [view, setView] = useState<View>("game");
-  const [statsOn, setStatsOn] = useState(false);
-  const viewRef = useRef<View>("game");
+  // Screen switching. Screens are stacked top→bottom in this order; → wipes the
+  // current one away with the scan bar (revealing the next, which draws itself),
+  // ← un-draws the current one and wipes the previous one back in.
+  const [viewIdx, setViewIdx] = useState(0);
+  const [drawn, setDrawn] = useState<boolean[]>(() => VIEWS.map((_, i) => i === 0));
+  const viewRef = useRef(0);
   const busy = useRef(false);
-  const gameRef = useRef<HTMLDivElement>(null);
+  const layerRefs = useRef<(HTMLDivElement | null)[]>([]);
   const barRef = useRef<HTMLDivElement>(null);
+  const view = VIEWS[viewIdx];
 
-  // `edge` = x of the wipe line. The game is visible only to the right of it.
-  const placeWipe = (edge: number, movingRight: boolean) => {
-    const g = gameRef.current;
+  const setDrawnAt = (i: number, on: boolean) =>
+    setDrawn((d) => d.map((v, k) => (k === i ? on : v)));
+
+  // `edge` = x of the wipe line. The layer stays visible only to the right of it.
+  const placeWipe = (layer: number, edge: number, movingRight: boolean) => {
+    const g = layerRefs.current[layer];
     const b = barRef.current;
     if (g) g.style.clipPath = `inset(0 0 0 ${Math.min(Math.max(edge, 0), STAGE_W)}px)`;
     if (b) b.style.transform = movingRight ? `translateX(${edge - SCAN_W}px)` : `translateX(${edge}px) scaleX(-1)`;
   };
 
-  const goStats = async () => {
-    if (busy.current || viewRef.current === "stats") return;
+  const goNext = async () => {
+    const i = viewRef.current;
+    if (busy.current || i >= VIEWS.length - 1) return;
     busy.current = true;
-    viewRef.current = "stats";
-    setView("stats");
+    viewRef.current = i + 1;
+    setViewIdx(i + 1);
     let started = false;
     await tween(WIPE_MS, (p) => {
-      placeWipe(easeInOut(p) * (STAGE_W + SCAN_W), true);
-      // start drawing the table while the bar is still crossing
+      placeWipe(i, easeInOut(p) * (STAGE_W + SCAN_W), true);
+      // start drawing the next screen while the bar is still crossing
       if (!started && p > 0.45) {
         started = true;
-        setStatsOn(true);
+        setDrawnAt(i + 1, true);
       }
     });
+    setDrawnAt(i, false); // fully hidden now; reset so it draws in fresh on return
     busy.current = false;
   };
 
-  const goGame = async () => {
-    if (busy.current || viewRef.current === "game") return;
+  const goPrev = async () => {
+    const i = viewRef.current;
+    if (busy.current || i <= 0) return;
     busy.current = true;
-    setStatsOn(false); // the table un-draws first
+    setDrawnAt(i, false); // the current screen un-draws first
     await wait(420);
+    setDrawnAt(i - 1, true);
     // mirrored bar trails to the right of the edge, so run it past 0 to leave the screen
-    await tween(WIPE_MS, (p) => placeWipe((1 - easeInOut(p)) * (STAGE_W + 2 * SCAN_W) - SCAN_W, false));
-    viewRef.current = "game";
-    setView("game");
+    await tween(WIPE_MS, (p) => placeWipe(i - 1, (1 - easeInOut(p)) * (STAGE_W + 2 * SCAN_W) - SCAN_W, false));
+    viewRef.current = i - 1;
+    setViewIdx(i - 1);
     busy.current = false;
   };
-  const nav = useRef({ goStats, goGame });
+  const nav = useRef({ goNext, goPrev });
   useEffect(() => {
-    nav.current = { goStats, goGame };
+    nav.current = { goNext, goPrev };
   });
 
   // Restore saved state (survives a page refresh mid-match). The ref makes it
@@ -139,12 +150,12 @@ export default function PolygameScreen() {
 
       if (e.key === "ArrowRight") {
         e.preventDefault();
-        nav.current.goStats();
+        nav.current.goNext();
         return;
       }
       if (e.key === "ArrowLeft") {
         e.preventDefault();
-        nav.current.goGame();
+        nav.current.goPrev();
         return;
       }
       if (e.key.toLowerCase() === "h") {
@@ -152,7 +163,7 @@ export default function PolygameScreen() {
         return;
       }
       // Game controls only work on the Polygame screen
-      if (viewRef.current !== "game") return;
+      if (viewRef.current !== 0) return;
 
       if (e.code === "Space") {
         e.preventDefault();
@@ -195,10 +206,18 @@ export default function PolygameScreen() {
       >
         <ParticleField />
 
-        <StatsScreen on={statsOn} active={view === "stats"} teams={state.teams} dispatch={dispatch} />
+        {/* Bottom of the stack: Game Stats */}
+        <div ref={(el) => void (layerRefs.current[2] = el)} inert={view !== "final"} className="absolute inset-0 z-10">
+          <FinalScreen on={drawn[2]} teams={state.teams} />
+        </div>
 
-        {/* Polygame screen, clipped away by the scan bar on → */}
-        <div ref={gameRef} inert={view !== "game"} className="absolute inset-0 z-10 bg-[var(--bg)]">
+        {/* Phase Stats */}
+        <div ref={(el) => void (layerRefs.current[1] = el)} inert={view !== "stats"} className="absolute inset-0 z-20">
+          <StatsScreen on={drawn[1]} active={view === "stats"} teams={state.teams} dispatch={dispatch} />
+        </div>
+
+        {/* Top: Polygame screen (opaque), clipped away by the scan bar on → */}
+        <div ref={(el) => void (layerRefs.current[0] = el)} inert={view !== "game"} className="absolute inset-0 z-30 bg-[var(--bg)]">
         <ParticleField />
         <div className="relative flex h-full flex-col gap-4 px-8 pb-6 pt-6">
           {/* Header: game label | POLYGAME */}
@@ -274,7 +293,7 @@ function HelpOverlay({ onClose }: { onClose: () => void }) {
           </table>
           <ul className="mt-6 space-y-1.5 text-base text-[var(--text-dim)]">
             <li><Kbd>Space</Kbd> start / pause both timers</li>
-            <li><Kbd>→</Kbd> Phase Stats screen · <Kbd>←</Kbd> back to Polygame</li>
+            <li><Kbd>→</Kbd> next screen (Polygame → Phase Stats → Game Stats) · <Kbd>←</Kbd> back</li>
             <li>Phase Stats: hover any value and type (digits : . % -) · <Kbd>Backspace</Kbd> / <Kbd>Del</Kbd></li>
             <li><Kbd>Shift</Kbd>+<Kbd>X</Kbd> twice — reset everything</li>
             <li>Shapes: left click removes / brings back · right click greys / restores</li>

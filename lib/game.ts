@@ -254,6 +254,10 @@ export function reducer(s: GameState, a: Action): GameState {
   }
 }
 
+/** Total score = Phase 1 + Phase 2 + Phase 3 (blank / unreadable count as 0). */
+export const teamTotal = (st: TeamStats) =>
+  [st.ph1, st.ph2, st.ph3].reduce((sum, v) => sum + (parseFloat(v) || 0), 0);
+
 export const formatTime = (ms: number) => {
   const total = Math.floor(ms / 100);
   const tenths = total % 10;

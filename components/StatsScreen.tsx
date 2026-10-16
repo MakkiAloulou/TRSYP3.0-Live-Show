@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import type { Action, StatField, TeamId, TeamState } from "@/lib/game";
+import { useEffect, useRef, type ReactNode } from "react";
+import { teamTotal, type Action, type StatField, type TeamId, type TeamState } from "@/lib/game";
+import { CountUp, framePath, Line, Reveal, timing } from "./Draw";
 
 /* Phase Stats: a table that draws itself like a pen stroke when `on` turns
    true, and un-draws (last pieces first, quicker) when it turns false.
@@ -22,14 +23,6 @@ const PH_BOT = 790;
 const TOTAL_LINE = 968;
 
 const halfX = (t: TeamId) => (t === 0 ? [X0 + PAD, MID - PAD] : [MID + PAD, X1 - PAD]);
-
-/** Timing: enter uses `d` / `dur`; exit runs in reverse order and faster. */
-const LAST = 1500;
-const timing = (on: boolean, d: number, dur: number) =>
-  ({
-    "--delay": `${on ? d : Math.round((LAST - d) * 0.16)}ms`,
-    "--dur": `${on ? dur : 320}ms`,
-  }) as CSSProperties;
 
 const ROWS: { label: string; value: StatField; plus: StatField; kind: "time" | "position" | "accuracy" }[] = [
   { label: "Time", value: "time", plus: "timePlus", kind: "time" },
@@ -86,7 +79,7 @@ export default function StatsScreen({ on, active, teams, dispatch }: Props) {
             style={{ ...timing(on, 0, 1100), filter: "drop-shadow(0 0 5px rgba(41,224,143,0.85))" }}
             stroke="var(--neon)"
             strokeWidth={2}
-            d={`M ${MID} ${Y0} L ${X1 - CUT} ${Y0} L ${X1} ${Y0 + CUT} L ${X1} ${Y1 - CUT} L ${X1 - CUT} ${Y1} L ${X0 + CUT} ${Y1} L ${X0} ${Y1 - CUT} L ${X0} ${Y0 + CUT} L ${X0 + CUT} ${Y0} Z`}
+            d={framePath(X0, Y0, X1, Y1, CUT)}
           />
           <Line on={on} d={260} dur={700} x1={X0} y1={TITLE_Y} x2={X1} y2={TITLE_Y} strong />
           <Line on={on} d={460} dur={760} x1={MID} y1={TITLE_Y} x2={MID} y2={Y1} strong />
@@ -136,7 +129,7 @@ export default function StatsScreen({ on, active, teams, dispatch }: Props) {
         const w = b - a;
         const st = teams[t].stats;
         const o = t * 60;
-        const total = PHASES.reduce((sum, f) => sum + (parseFloat(st[f]) || 0), 0);
+        const total = teamTotal(st);
         return (
           <div key={t}>
             {/* team name */}
@@ -150,6 +143,16 @@ export default function StatsScreen({ on, active, teams, dispatch }: Props) {
                 <span className="ml-4 inline-block h-2.5 w-2.5 -translate-y-2 rotate-45 bg-[var(--pink)] shadow-[0_0_8px_var(--pink)]" />
               </h2>
             </div>
+
+            {/* column header over the bonus points */}
+            <Reveal
+              on={on}
+              d={740 + o}
+              className="absolute pr-2 text-right text-[13px] font-semibold uppercase tracking-[0.4em] text-[var(--pink)]"
+              style={{ left: a, width: w, top: ROW_LINES[0] - 26 }}
+            >
+              Bonus
+            </Reveal>
 
             {/* time / position / accuracy */}
             {ROWS.map((r, i) => {
@@ -218,34 +221,6 @@ export default function StatsScreen({ on, active, teams, dispatch }: Props) {
 
 /* ─── pieces ─────────────────────────────────────────────────────────── */
 
-function Line({
-  on, d, dur, x1, y1, x2, y2, strong, pink,
-}: { on: boolean; d: number; dur: number; x1: number; y1: number; x2: number; y2: number; strong?: boolean; pink?: boolean }) {
-  return (
-    <path
-      pathLength={1}
-      className={`draw ${on ? "on" : ""}`}
-      style={{
-        ...timing(on, d, dur),
-        filter: pink ? "drop-shadow(0 0 6px var(--pink))" : strong ? "drop-shadow(0 0 4px rgba(41,224,143,0.7))" : undefined,
-      }}
-      stroke={pink ? "var(--pink)" : strong ? "var(--neon)" : "var(--neon-dim)"}
-      strokeWidth={pink ? 3 : strong ? 1.6 : 1.2}
-      d={`M ${x1} ${y1} L ${x2} ${y2}`}
-    />
-  );
-}
-
-function Reveal({
-  on, d, className, style, children,
-}: { on: boolean; d: number; className?: string; style?: CSSProperties; children: ReactNode }) {
-  return (
-    <div className={`reveal ${on ? "on" : ""} ${className ?? ""}`} style={{ ...style, ...timing(on, d, 520) }}>
-      {children}
-    </div>
-  );
-}
-
 const EMPTY = <span className="text-[var(--neon-dim)]">—</span>;
 const NUMERIC = /^-?\d+(\.\d+)?$/;
 
@@ -305,31 +280,6 @@ const ordinal = (n: number) => {
   if (v >= 11 && v <= 13) return "th";
   return ["th", "st", "nd", "rd"][v % 10] ?? "th";
 };
-
-/** Counts up 0 → value each time the screen draws in; edits afterwards show instantly. */
-function CountUp({ value, on, delay, decimals = 0 }: { value: number; on: boolean; delay: number; decimals?: number }) {
-  const [shown, setShown] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (!on) return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    let raf = 0;
-    const start = performance.now() + delay;
-    const tick = (now: number) => {
-      const p = Math.min(1, Math.max(0, (now - start) / 800));
-      const eased = 1 - Math.pow(1 - p, 3);
-      setShown(p >= 1 ? null : value * eased);
-      if (p < 1) raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-    // only replay when the screen draws in, not on every edit
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [on]);
-
-  const v = shown ?? value;
-  return <>{decimals ? v.toFixed(decimals) : Math.round(v)}</>;
-}
 
 /** Keys accepted while hovering a value. Digits by physical key (AZERTY-safe). */
 function statKey(e: KeyboardEvent): string | null {
