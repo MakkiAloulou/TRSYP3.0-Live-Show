@@ -36,9 +36,12 @@ export default function ColorGrid({ grid, onCell, onHalf, onKey }: Props) {
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (!hover.current || e.ctrlKey || e.metaKey || e.altKey) return;
-      if (/^[0-9]$/.test(e.key) || e.key === "Backspace" || e.key === "Delete") {
+      // Read the physical key: on AZERTY the top row gives "&é\"'(" without Shift
+      const digit = /^(Digit|Numpad)([0-9])$/.exec(e.code)?.[2];
+      const key = digit ?? (e.key === "Backspace" || e.key === "Delete" ? e.key : null);
+      if (key) {
         e.preventDefault();
-        onKeyRef.current(hover.current.i, hover.current.h, e.key);
+        onKeyRef.current(hover.current.i, hover.current.h, key);
       }
     };
     window.addEventListener("keydown", down);
@@ -60,16 +63,17 @@ export default function ColorGrid({ grid, onCell, onHalf, onKey }: Props) {
         return (
           <div key={i} className="relative" style={{ boxShadow: glow }}>
             <svg viewBox="0 0 10 10" className="block h-full w-full" aria-label={`Square ${i + 1}`}>
+              {/* A full square is painted as ONE rect, so no seam can appear between the halves */}
+              {cell.full && <rect width="10" height="10" fill={FILL[a]} pointerEvents="none" />}
               {HALVES.map(({ h, pts }) => (
                 <polygon
                   key={h}
                   points={pts}
                   role="button"
                   aria-label={`Square ${i + 1} ${h === 0 ? "top-right" : "bottom-left"}: ${NAME[cell.colors[h]]}`}
-                  fill={FILL[cell.colors[h]]}
-                  stroke={FILL[cell.colors[h]]}
-                  strokeWidth={0.05} // closes the hairline gap between the halves of a full square
-                  className="cursor-pointer transition-[fill,stroke] duration-150"
+                  // halves stay as (invisible) click targets on a full square
+                  fill={cell.full ? "transparent" : FILL[cell.colors[h]]}
+                  className="cursor-pointer transition-[fill] duration-150"
                   onPointerEnter={() => (hover.current = { i, h })}
                   onClick={() => onCell(i, h)}
                   onContextMenu={(e) => {

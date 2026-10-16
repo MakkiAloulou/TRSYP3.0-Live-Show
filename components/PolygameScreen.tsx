@@ -10,17 +10,17 @@ const STAGE_W = 1920;
 const STAGE_H = 1080;
 const STORAGE_KEY = "trsyp3-polygame-v3";
 
-/* Keyboard map (by physical key, so layout/caps lock don't matter).
-   Shift + points key = ±5. */
+/* Keyboard map by the letter printed on the key (works on AZERTY and QWERTY;
+   caps lock / Shift don't matter). Shift + points key = ±5. */
 const KEYS = {
-  KeyQ: { type: "toggleTimer", team: 0 },
-  KeyA: { type: "resetTimer", team: 0 },
-  KeyW: { type: "points", team: 0, delta: 1 },
-  KeyS: { type: "points", team: 0, delta: -1 },
-  KeyP: { type: "toggleTimer", team: 1 },
-  KeyL: { type: "resetTimer", team: 1 },
-  KeyO: { type: "points", team: 1, delta: 1 },
-  KeyK: { type: "points", team: 1, delta: -1 },
+  q: { type: "toggleTimer", team: 0 },
+  a: { type: "resetTimer", team: 0 },
+  w: { type: "points", team: 0, delta: 1 },
+  s: { type: "points", team: 0, delta: -1 },
+  p: { type: "toggleTimer", team: 1 },
+  l: { type: "resetTimer", team: 1 },
+  o: { type: "points", team: 1, delta: 1 },
+  k: { type: "points", team: 1, delta: -1 },
 } as const;
 
 export default function PolygameScreen() {
@@ -69,12 +69,13 @@ export default function PolygameScreen() {
         dispatch({ type: "toggleBoth", now });
         return;
       }
-      if (e.code === "KeyH") {
+      const letter = e.key.toLowerCase();
+      if (letter === "h") {
         setHelp((h) => !h);
         return;
       }
       // Shift+X twice within 2s resets both boards, timers and points
-      if (e.code === "KeyX" && e.shiftKey) {
+      if (letter === "x" && e.shiftKey) {
         if (now - resetArm.current < 2000) {
           dispatch({ type: "resetAll" });
           resetArm.current = 0;
@@ -83,7 +84,7 @@ export default function PolygameScreen() {
         }
         return;
       }
-      const k = KEYS[e.code as keyof typeof KEYS];
+      const k = KEYS[letter as keyof typeof KEYS];
       if (!k) return;
       e.preventDefault();
       if (k.type === "points") dispatch({ type: "addPoints", team: k.team, delta: k.delta * (e.shiftKey ? 5 : 1) });
