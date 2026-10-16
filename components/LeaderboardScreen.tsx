@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { matchGains, reducer, type Action, type GameState } from "@/lib/game";
+import { matchGains, needsLeagueUpdate, pendingGains, reducer, type Action, type GameState } from "@/lib/game";
 
 /** Standings as they will be after this match is added. */
 const reducerPreview = (s: GameState) => reducer(s, { type: "commitMatch" }).league;
@@ -46,7 +46,7 @@ interface Update {
 }
 
 export default function LeaderboardScreen({ on, active, state, dispatch }: Props) {
-  const { league, matchCommitted } = state;
+  const { league } = state;
   const [update, setUpdate] = useState<Update | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const hover = useRef<string | null>(null);
@@ -65,8 +65,8 @@ export default function LeaderboardScreen({ on, active, state, dispatch }: Props
     }
     const t = setTimeout(() => {
       const { state: s, dispatch: d } = live.current;
-      if (s.matchCommitted) return;
-      const gains = matchGains(s);
+      if (!needsLeagueUpdate(s)) return;
+      const gains = pendingGains(s);
       const prevRank = Object.fromEntries(s.league.map((l, i) => [l.id, i]));
       setUpdate({ gains, prevRank });
       d({ type: "commitMatch" });
@@ -224,7 +224,7 @@ export default function LeaderboardScreen({ on, active, state, dispatch }: Props
                   className="slam digits neon-text absolute flex h-full items-center text-[30px]"
                   style={{ left: C_GAIN, "--delay": "0ms" } as CSSProperties}
                 >
-                  +{gain}
+                  {gain >= 0 ? `+${gain}` : gain}
                 </span>
               )}
             </Reveal>
@@ -232,7 +232,7 @@ export default function LeaderboardScreen({ on, active, state, dispatch }: Props
         );
       })}
 
-      {!matchCommitted && on && (
+      {needsLeagueUpdate(state) && on && (
         <Reveal on={on} d={1300} className="absolute left-0 right-0 text-center text-[13px] uppercase tracking-[0.4em] text-[var(--text-dim)]" style={{ top: Y1 - 34 }}>
           Updating with this match…
         </Reveal>

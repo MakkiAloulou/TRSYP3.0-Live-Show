@@ -36,6 +36,8 @@ export type StatField = keyof TeamStats;
 
 export interface TeamState {
   name: string;
+  /** Which of the 9 league teams this is (set when the match is created) */
+  leagueId?: string;
   shapes: Record<string, ShapeState>;
   grid: GridCell[];
   timer: TimerState;
@@ -51,13 +53,31 @@ export interface LeagueTeam {
   played: number;
 }
 
+/** One match on screen 0: two league teams and everything played in it */
+export interface Match {
+  id: string;
+  num: number;
+  teams: [TeamState, TeamState];
+  opened: boolean;
+  committed: boolean;
+  /** Points already added to the league for each team (so corrections add only the difference) */
+  applied: Record<string, number>;
+}
+export type MatchStatus = "upcoming" | "live" | "done";
+export const matchStatus = (m: Match): MatchStatus => (m.committed ? "done" : m.opened ? "live" : "upcoming");
+
 export interface GameState {
-  /** The two teams playing the current match */
+  /** Working copy of the open match's two teams (mirrored into `matches`) */
   teams: [TeamState, TeamState];
   /** Overall standings, always kept sorted (points desc, previous order breaks ties) */
   league: LeagueTeam[];
-  /** True once this match's totals have been added to the league */
+  /** True once the open match's totals have been added to the league */
   matchCommitted: boolean;
+  /** Points already added to the league by the open match */
+  applied: Record<string, number>;
+  matches: Match[];
+  /** id of the open match (null = none opened yet) */
+  current: string | null;
 }
 
 export type Action =
@@ -73,6 +93,9 @@ export type Action =
   | { type: "rename"; team: TeamId; name: string }
   | { type: "resetAll" }
   | { type: "commitMatch" }
+  | { type: "addMatch"; a: string; b: string }
+  | { type: "deleteMatch"; id: string }
+  | { type: "openMatch"; id: string }
   | { type: "renameLeague"; id: string; name: string }
   | { type: "editLeaguePoints"; id: string; key: string }
   | { type: "load"; state: GameState };
@@ -163,20 +186,38 @@ const freshTeam = (name: string): TeamState => ({
 });
 
 /** Fill in anything a save from an older version is missing. */
-export const normalizeState = (s: GameState): GameState => ({
-  league: Array.isArray(s.league) && s.league.length ? s.league : freshLeague(),
-  matchCommitted: !!s.matchCommitted,
-  teams: s.teams.map((t) => {
-    const base = freshTeam(t.name);
-    return { ...base, ...t, grid: (t.grid ?? base.grid).map(toCell), stats: { ...base.stats, ...t.stats } };
-  }) as GameState["teams"],
-});
+const normTeam = (t: TeamState): TeamState => {
+  const base = freshTeam(t.name);
+  return { ...base, ...t, grid: (t.grid ?? base.grid).map(toCell), stats: { ...base.stats, ...t.stats } };
+};
 
-export const initialState = (): GameState => ({
-  teams: [freshTeam("CUBOT"), freshTeam("TEST 2")],
-  league: freshLeague(),
-  matchCommitted: false,
-});
+export const normalizeState = (s: GameState): GameState => {
+  const league = Array.isArray(s.league) && s.league.length ? s.league : freshLeague();
+  const teams = s.teams.map(normTeam) as GameState["teams"];
+  const matches = Array.isArray(s.matches)
+    ? s.matches.map((m) => ({ ...m, applied: m.applied ?? {}, teams: m.teams.map(normTeam) as Match["teams"] }))
+    : [];
+  return {
+    league,
+    teams,
+    matchCommitted: !!s.matchCommitted,
+    applied: s.applied ?? {},
+    matches,
+    current: s.current ?? null,
+  };
+};
+
+const newMatch = (league: LeagueTeam[], id: string, num: number, a: string, b: string): Match => {
+  const team = (tid: string) => ({ ...freshTeam(league.find((l) => l.id === tid)?.name ?? "?"), leagueId: tid });
+  return { id, num, teams: [team(a), team(b)], opened: false, committed: false, applied: {} };
+};
+
+export const initialState = (): GameState => {
+  const league = freshLeague();
+  // one starter match so screen 0 isn't empty
+  const first = newMatch(league, "m1", 1, "t6", "t7"); // fixed id: same on server and client
+  return { teams: first.teams, league, matchCommitted: false, applied: {}, matches: [first], current: null };
+};
 
 function freshLeague(): LeagueTeam[] {
   // Starting order (everyone on 0): CUBOT starts 6th
@@ -192,12 +233,38 @@ const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().t
 /** Points each league team would gain from the current match (by matching team names). */
 export const matchGains = (s: GameState): Record<string, number> => {
   const gains: Record<string, number> = {};
+  if (!s.current) return gains;
   for (const t of s.teams) {
-    const lt = s.league.find((l) => sameName(l.name, t.name));
+    const lt = s.league.find((l) => (t.leagueId ? l.id === t.leagueId : sameName(l.name, t.name)));
     if (lt) gains[lt.id] = (gains[lt.id] ?? 0) + teamTotal(t.stats);
   }
   return gains;
 };
+
+/** What the leaderboard still has to apply for the open match (new totals minus what's already in). */
+export const pendingGains = (s: GameState): Record<string, number> => {
+  const now = matchGains(s);
+  const out: Record<string, number> = {};
+  for (const id of new Set([...Object.keys(now), ...Object.keys(s.applied)])) {
+    const d = (now[id] ?? 0) - (s.applied[id] ?? 0);
+    if (d !== 0) out[id] = d;
+  }
+  return out;
+};
+
+/** True when opening the leaderboard should animate an update. */
+export const needsLeagueUpdate = (s: GameState) =>
+  !!s.current && (!s.matchCommitted || Object.keys(pendingGains(s)).length > 0);
+
+/** Take a match's points (and its "played") back out of the league. */
+const revertApplied = (league: LeagueTeam[], applied: Record<string, number>, committed: boolean) =>
+  sortLeague(
+    league.map((l) =>
+      l.id in applied
+        ? { ...l, points: l.points - (applied[l.id] ?? 0), played: Math.max(0, l.played - (committed ? 1 : 0)) }
+        : l,
+    ),
+  );
 
 /** Accepts any older saved / in-memory cell shape and returns a valid GridCell. */
 export function toCell(raw: unknown): GridCell {
@@ -234,7 +301,20 @@ const updateCell = (s: GameState, team: TeamId, index: number, fn: (c: GridCell)
     return { ...t, grid };
   });
 
+/** Every change to the open match is mirrored into its entry in `matches`. */
 export function reducer(s: GameState, a: Action): GameState {
+  const n = baseReducer(s, a);
+  if (!n.current || a.type === "load") return n;
+  if (n.teams === s.teams && n.matchCommitted === s.matchCommitted && n.applied === s.applied && n.matches === s.matches) return n;
+  return {
+    ...n,
+    matches: n.matches.map((m) =>
+      m.id === n.current ? { ...m, teams: n.teams, committed: n.matchCommitted, applied: n.applied } : m,
+    ),
+  };
+}
+
+function baseReducer(s: GameState, a: Action): GameState {
   switch (a.type) {
     case "setShape":
       return updateTeam(s, a.team, (t) => ({ ...t, shapes: { ...t.shapes, [a.id]: a.state } }));
@@ -288,19 +368,59 @@ export function reducer(s: GameState, a: Action): GameState {
     case "rename":
       return updateTeam(s, a.team, (t) => ({ ...t, name: a.name }));
     case "resetAll":
-      // New match: clear boards, timers, points and stats; keep the league
+      // Restart the open match: clear boards, timers, points and stats, and take
+      // anything it already added back out of the league
       return {
         ...s,
-        teams: s.teams.map((t) => ({ ...freshTeam(t.name) })) as GameState["teams"],
+        league: s.matchCommitted ? revertApplied(s.league, s.applied, true) : s.league,
+        teams: s.teams.map((t) => ({ ...freshTeam(t.name), leagueId: t.leagueId })) as GameState["teams"],
         matchCommitted: false,
+        applied: {},
       };
     case "commitMatch": {
-      if (s.matchCommitted) return s;
-      const gains = matchGains(s);
-      const league = s.league.map((l) =>
-        l.id in gains ? { ...l, points: l.points + gains[l.id], played: l.played + 1 } : l,
-      );
-      return { ...s, league: sortLeague(league), matchCommitted: true };
+      // First time: add totals and count the game as played. Later (after a
+      // correction): add only the difference.
+      if (!needsLeagueUpdate(s)) return s;
+      const diff = pendingGains(s);
+      const first = !s.matchCommitted;
+      const playing = new Set(Object.keys(matchGains(s)));
+      const league = s.league.map((l) => ({
+        ...l,
+        points: l.points + (diff[l.id] ?? 0),
+        played: l.played + (first && playing.has(l.id) ? 1 : 0),
+      }));
+      return { ...s, league: sortLeague(league), matchCommitted: true, applied: matchGains(s) };
+    }
+    case "addMatch": {
+      const num = Math.max(0, ...s.matches.map((m) => m.num)) + 1;
+      return { ...s, matches: [...s.matches, newMatch(s.league, `m${num}-${Date.now().toString(36)}`, num, a.a, a.b)] };
+    }
+    case "deleteMatch": {
+      const m = s.matches.find((x) => x.id === a.id);
+      if (!m) return s;
+      return {
+        ...s,
+        league: m.committed ? revertApplied(s.league, m.applied, true) : s.league,
+        matches: s.matches.filter((x) => x.id !== a.id),
+        current: s.current === a.id ? null : s.current,
+      };
+    }
+    case "openMatch": {
+      const m = s.matches.find((x) => x.id === a.id);
+      if (!m) return s;
+      // names follow the league (in case a team was renamed there)
+      const named = m.teams.map((t) => ({
+        ...t,
+        name: s.league.find((l) => l.id === t.leagueId)?.name ?? t.name,
+      })) as Match["teams"];
+      return {
+        ...s,
+        current: m.id,
+        teams: named,
+        matchCommitted: m.committed,
+        applied: m.applied,
+        matches: s.matches.map((x) => (x.id === m.id ? { ...x, opened: true, teams: named } : x)),
+      };
     }
     case "renameLeague":
       return { ...s, league: s.league.map((l) => (l.id === a.id ? { ...l, name: a.name } : l)) };

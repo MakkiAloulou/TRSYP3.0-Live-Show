@@ -2,6 +2,15 @@
 
 Live match screens for the TRSYP 3.0 robotics competition. Built screen by screen, merged later.
 
+## Screen 0 — Matches
+
+The app opens on a grid of match cards ("CUBOT VS TEST 2"), each with a status — UPCOMING, LIVE (opened) or DONE (its points are on the leaderboard) — and the final totals once done. Click a card: the stage zooms into it and it becomes the Polygame screen for that match. `Z` zooms back out to the list from any screen.
+
+- `N` — new match, then press `1`–`9` for team A and again for team B (Backspace undo, Esc cancel)
+- Hover a card + `Delete` twice — remove it (a DONE match's points are taken back off the leaderboard)
+
+Every match keeps its own boards, timers and stats. Reopening a DONE match and correcting a score makes the leaderboard apply only the difference (games played isn't counted twice). `Shift+X` twice restarts the open match and takes its points back off.
+
 ## Screen 1 — Polygame
 
 A fixed 1920×1080 stage that scales to the window. Two teams, each with:
@@ -44,7 +53,8 @@ All sound effects are synthesised in the browser (Web Audio, no files): timer be
 
 - `→` / `←` — next / previous screen (Polygame → Phase Stats → Game Stats → Leaderboard)
 - `Space` — start / pause both timers (Polygame screen)
-- `Shift+X` twice within 2 s — new match (keeps the leaderboard)
+- `Shift+X` twice within 2 s — restart the open match
+- `Z` — back to the match list
 - `H` — show / hide the controls panel
 - `M` — mute / unmute sound
 - Double-click a team name to rename it (defaults: CUBOT, TEST 2)

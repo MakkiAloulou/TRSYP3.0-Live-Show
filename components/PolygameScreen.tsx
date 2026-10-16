@@ -8,12 +8,13 @@ import ParticleField from "./ParticleField";
 import ScanBar, { SCAN_W } from "./ScanBar";
 import FinalScreen from "./FinalScreen";
 import LeaderboardScreen from "./LeaderboardScreen";
+import MatchesScreen from "./MatchesScreen";
 import StatsScreen from "./StatsScreen";
 import TeamPanel from "./TeamPanel";
 
 const STAGE_W = 1920;
 const STAGE_H = 1080;
-const STORAGE_KEY = "trsyp3-polygame-v4"; // v4: fresh leaderboard start (CUBOT 6th, all on 0)
+const STORAGE_KEY = "trsyp3-polygame-v5"; // v5: matches (screen 0)
 
 /* Keyboard map by the letter printed on the key (works on AZERTY and QWERTY;
    caps lock / Shift don't matter). Shift + points key = ±5. */
@@ -61,6 +62,10 @@ const tween = (ms: number, frame: (p: number) => void) =>
   });
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const ZOOM_MS = 700;
+const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+type Rect = { x: number; y: number; w: number; h: number };
+const FULL: Rect = { x: 0, y: 0, w: STAGE_W, h: STAGE_H };
 
 /** Sounds while a screen draws itself in (times match each screen's animation). */
 const drawSounds = (i: number) => {
@@ -150,6 +155,104 @@ export default function PolygameScreen() {
     busy.current = false;
     runQueued();
   };
+  /* ── Screen 0 (match list) and the zoom in / out of a card ── */
+  const [listOpen, setListOpen] = useState(true);
+  const [listOn, setListOn] = useState(true);
+  const listOpenRef = useRef(true);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const zoomRef = useRef<HTMLDivElement>(null);
+  const [zoomLabel, setZoomLabel] = useState("");
+
+  const toStage = (el: HTMLElement): Rect => {
+    const s = stageRef.current!.getBoundingClientRect();
+    const r = el.getBoundingClientRect();
+    const k = s.width / STAGE_W;
+    return { x: (r.left - s.left) / k, y: (r.top - s.top) / k, w: r.width / k, h: r.height / k };
+  };
+  const placeZoom = (r: Rect, opacity: number) => {
+    const z = zoomRef.current;
+    if (!z) return;
+    z.style.display = "block";
+    z.style.left = `${r.x}px`;
+    z.style.top = `${r.y}px`;
+    z.style.width = `${r.w}px`;
+    z.style.height = `${r.h}px`;
+    z.style.opacity = String(opacity);
+  };
+  const hideZoom = () => {
+    if (zoomRef.current) zoomRef.current.style.display = "none";
+  };
+  const placeList = (opacity: number, scale: number, origin: Rect) => {
+    const l = listRef.current;
+    if (!l) return;
+    l.style.opacity = String(opacity);
+    l.style.transformOrigin = `${origin.x + origin.w / 2}px ${origin.y + origin.h / 2}px`;
+    l.style.transform = `scale(${scale})`;
+  };
+  /** Put the four match screens back to "Polygame showing, nothing else drawn". */
+  const resetFlow = () => {
+    layerRefs.current.forEach((l) => l && (l.style.clipPath = ""));
+    setDrawn(VIEWS.map((_, i) => i === 0));
+    viewRef.current = 0;
+    setViewIdx(0);
+  };
+
+  const openMatch = async (id: string, card: HTMLElement) => {
+    if (busy.current || !listOpenRef.current) return;
+    busy.current = true;
+    const from = toStage(card);
+    const m = stateRef.current.matches.find((x) => x.id === id);
+    setZoomLabel(m ? `${m.teams[0].name}  VS  ${m.teams[1].name}` : "");
+    dispatch({ type: "openMatch", id });
+    resetFlow();
+    sfx.zoomIn();
+    const game = layerRefs.current[0];
+    await tween(ZOOM_MS, (p) => {
+      const q = easeInOut(p);
+      placeZoom({ x: lerp(from.x, 0, q), y: lerp(from.y, 0, q), w: lerp(from.w, STAGE_W, q), h: lerp(from.h, STAGE_H, q) }, 1);
+      placeList(1 - q, 1 + 0.25 * q, from);
+      if (game) game.style.transform = `scale(${1.08 - 0.08 * q})`;
+    });
+    listOpenRef.current = false;
+    setListOpen(false);
+    setListOn(false);
+    if (game) game.style.transform = "";
+    await tween(260, (p) => placeZoom(FULL, 1 - p));
+    hideZoom();
+    busy.current = false;
+  };
+
+  const backToList = async () => {
+    if (busy.current || listOpenRef.current) return;
+    busy.current = true;
+    const cur = stateRef.current.current;
+    const card = cur ? listRef.current?.querySelector<HTMLElement>(`[data-match="${cur}"]`) : null;
+    const to: Rect = card ? toStage(card) : { x: STAGE_W / 2 - 240, y: STAGE_H / 2 - 90, w: 480, h: 180 };
+    const m = stateRef.current.matches.find((x) => x.id === cur);
+    setZoomLabel(m ? `${m.teams[0].name}  VS  ${m.teams[1].name}` : "");
+    sfx.zoomOut();
+    // cover the current screen, then shrink back into the card
+    await tween(200, (p) => placeZoom(FULL, p));
+    resetFlow();
+    listOpenRef.current = true;
+    setListOpen(true);
+    setListOn(true);
+    await tween(ZOOM_MS, (p) => {
+      const q = easeInOut(p);
+      placeZoom({ x: lerp(0, to.x, q), y: lerp(0, to.y, q), w: lerp(STAGE_W, to.w, q), h: lerp(STAGE_H, to.h, q) }, 1);
+      placeList(q, 1.25 - 0.25 * q, to);
+    });
+    placeList(1, 1, to);
+    await tween(220, (p) => placeZoom(to, 1 - p));
+    hideZoom();
+    busy.current = false;
+  };
+  const listNav = useRef({ openMatch, backToList });
+  useEffect(() => {
+    listNav.current = { openMatch, backToList };
+  });
+
   // A press during a transition is remembered and played right after it
   const queued = useRef<"next" | "prev" | null>(null);
   const runQueued = () => {
@@ -196,13 +299,13 @@ export default function PolygameScreen() {
       if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
       const now = Date.now();
 
-      if (e.key === "ArrowRight") {
+      if (e.key === "ArrowRight" && !listOpenRef.current) {
         e.preventDefault();
         if (busy.current) queued.current = "next";
         else nav.current.goNext();
         return;
       }
-      if (e.key === "ArrowLeft") {
+      if (e.key === "ArrowLeft" && !listOpenRef.current) {
         e.preventDefault();
         if (busy.current) queued.current = "prev";
         else nav.current.goPrev();
@@ -214,6 +317,13 @@ export default function PolygameScreen() {
       }
       if (e.key.toLowerCase() === "m") {
         setMuted(!isMuted());
+        return;
+      }
+      // Screen 0 handles its own keys (N, 1–9, Delete)
+      if (listOpenRef.current) return;
+      if (e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        void listNav.current.backToList();
         return;
       }
       // Game controls only work on the Polygame screen
@@ -267,6 +377,7 @@ export default function PolygameScreen() {
       className="fixed inset-0 flex items-center justify-center overflow-clip bg-[var(--bg)]">
       <div className="relative shrink-0 overflow-clip" style={{ width: STAGE_W * scale, height: STAGE_H * scale }}>
       <div
+        ref={stageRef}
         className="absolute left-0 top-0 overflow-clip"
         style={{ width: STAGE_W, height: STAGE_H, transform: `scale(${scale})`, transformOrigin: "0 0" }}
       >
@@ -274,7 +385,7 @@ export default function PolygameScreen() {
 
         {/* Bottom of the stack: Leaderboard */}
         <div ref={(el) => void (layerRefs.current[3] = el)} inert={view !== "board"} className="absolute inset-0 z-[5]">
-          <LeaderboardScreen on={drawn[3]} active={view === "board"} state={state} dispatch={dispatch} />
+          <LeaderboardScreen on={drawn[3]} active={!listOpen && view === "board"} state={state} dispatch={dispatch} />
         </div>
 
         {/* Game Stats */}
@@ -284,7 +395,7 @@ export default function PolygameScreen() {
 
         {/* Phase Stats */}
         <div ref={(el) => void (layerRefs.current[1] = el)} inert={view !== "stats"} className="absolute inset-0 z-20">
-          <StatsScreen on={drawn[1]} active={view === "stats"} teams={state.teams} dispatch={dispatch} />
+          <StatsScreen on={drawn[1]} active={!listOpen && view === "stats"} teams={state.teams} dispatch={dispatch} />
         </div>
 
         {/* Top: Polygame screen (opaque), clipped away by the scan bar on → */}
@@ -311,16 +422,46 @@ export default function PolygameScreen() {
 
           {/* Two teams, split down the middle */}
           <div className="relative grid min-h-0 flex-1 grid-cols-2 gap-16">
-            <TeamPanel id={0} team={state.teams[0]} dispatch={dispatch} active={view === "game"} />
+            <TeamPanel id={0} team={state.teams[0]} dispatch={dispatch} active={!listOpen && view === "game"} />
             <div
               className="absolute bottom-2 left-1/2 top-2 w-px -translate-x-1/2 bg-[var(--neon-dim)]"
               aria-hidden
             >
               <span className="absolute left-1/2 top-1/2 h-24 w-[3px] -translate-x-1/2 -translate-y-1/2 bg-[var(--pink)] shadow-[0_0_10px_var(--pink)]" />
             </div>
-            <TeamPanel id={1} team={state.teams[1]} dispatch={dispatch} active={view === "game"} />
+            <TeamPanel id={1} team={state.teams[1]} dispatch={dispatch} active={!listOpen && view === "game"} />
           </div>
         </div>
+        </div>
+
+        {/* Screen 0: match list (opaque, on top while open) */}
+        <div
+          ref={listRef}
+          inert={!listOpen}
+          // closed: invisible and click-through, so the match screens underneath get the mouse
+          className={`absolute inset-0 z-[35] bg-[var(--bg)] ${listOpen ? "" : "pointer-events-none invisible"}`}
+        >
+          <ParticleField />
+          <MatchesScreen
+            on={listOn}
+            active={listOpen}
+            state={state}
+            dispatch={dispatch}
+            onOpen={(id, el) => void listNav.current.openMatch(id, el)}
+          />
+        </div>
+
+        {/* the card that grows into a full screen (and shrinks back) */}
+        <div
+          ref={zoomRef}
+          aria-hidden
+          className="pointer-events-none absolute z-[38] hidden overflow-hidden border-2 border-[var(--neon)] bg-[var(--bg)] shadow-[0_0_40px_rgba(41,224,143,0.5)]"
+        >
+          <div className="flex h-full w-full items-center justify-center">
+            <span className="neon-text whitespace-pre font-[family-name:var(--font-display)] text-[44px] uppercase tracking-[0.12em]">
+              {zoomLabel}
+            </span>
+          </div>
         </div>
 
         <ScanBar ref={barRef} />
@@ -375,6 +516,7 @@ function HelpOverlay({ onClose }: { onClose: () => void }) {
           </table>
           <ul className="mt-6 space-y-1.5 text-base text-[var(--text-dim)]">
             <li><Kbd>Space</Kbd> start / pause both timers</li>
+            <li>Matches screen: <Kbd>N</Kbd> new match (then 1–9 twice) · click a card to open · hover + <Kbd>Del</Kbd> twice to remove · <Kbd>Z</Kbd> back to the list from any screen</li>
             <li><Kbd>→</Kbd> next screen (Polygame → Phase Stats → Game Stats → Leaderboard) · <Kbd>←</Kbd> back</li>
             <li>Leaderboard: hover points and type · double-click a name to rename</li>
             <li>Phase Stats: hover any value and type (digits : . % -) · <Kbd>Backspace</Kbd> / <Kbd>Del</Kbd></li>

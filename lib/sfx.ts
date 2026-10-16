@@ -167,6 +167,18 @@ export const sfx = {
     tone({ freq: 140, to: 620, dur, type: "sawtooth", gain: 0.05, attack: dur * 0.5, at });
   },
 
+  /** Diving into a match card: rising sweep + bright lock-on. */
+  zoomIn(at = 0) {
+    noise({ dur: 0.7, from: 300, to: 7000, q: 2, gain: 0.3, attack: 0.55, at });
+    tone({ freq: 110, to: 880, dur: 0.7, type: "sawtooth", gain: 0.07, attack: 0.5, at });
+    tone({ freq: 1760, dur: 0.25, type: "triangle", gain: 0.12, at: at + 0.68, wet: true });
+  },
+  /** Pulling back out to the match list. */
+  zoomOut(at = 0) {
+    noise({ dur: 0.7, from: 6000, to: 250, q: 2, gain: 0.26, attack: 0.08, at });
+    tone({ freq: 880, to: 110, dur: 0.7, type: "sawtooth", gain: 0.06, attack: 0.05, at });
+  },
+
   /** Lines drawing: an electric scribble made of fast filtered grains. */
   scribble(dur = 1.4, at = 0) {
     const n = Math.floor(dur / 0.045);
