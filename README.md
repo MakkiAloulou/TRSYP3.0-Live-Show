@@ -25,7 +25,7 @@ Press `→` again from Phase Stats. Shows each team's **total score** (taken fro
 
 ## Screen 4 — Leaderboard
 
-Press `→` from Game Stats. All 9 teams (placeholders CUBOT, TEST 2, TEAM 3–9 for now), ranked by points, with games played. The first time it opens after a match, it shows the old standings, then 3 s later each playing team's Game Stats total is added: points count up, a `+N` badge pops, rows slide to their new places and ▲/▼ show how far each team moved. Teams are matched by name to the two Polygame teams. Each match is added only once; equal points keep the previous order.
+Press `→` from Game Stats. All 9 teams (placeholders for now; everyone starts on 0 with CUBOT 6th), ranked by points, with games played. The first time it opens after a match, it shows the old standings, then 3 s later each playing team's Game Stats total is added: points count up, a `+N` badge pops, rows slide to their new places and ▲/▼ show how far each team moved. Teams are matched by name to the two Polygame teams. Each match is added only once; equal points keep the previous order.
 
 Fix things by hand: hover a team's points and type; double-click a name to rename. `Shift+X` twice starts a new match (clears boards, timers, points and stats, keeps the leaderboard).
 

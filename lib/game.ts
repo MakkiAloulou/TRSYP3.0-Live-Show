@@ -179,12 +179,9 @@ export const initialState = (): GameState => ({
 });
 
 function freshLeague(): LeagueTeam[] {
-  return ["CUBOT", "TEST 2", ...Array.from({ length: 7 }, (_, i) => `TEAM ${i + 3}`)].map((name, i) => ({
-    id: `t${i + 1}`,
-    name,
-    points: 0,
-    played: 0,
-  }));
+  // Starting order (everyone on 0): CUBOT starts 6th
+  const order = ["TEAM 3", "TEAM 4", "TEAM 5", "TEAM 6", "TEAM 7", "CUBOT", "TEST 2", "TEAM 8", "TEAM 9"];
+  return order.map((name, i) => ({ id: `t${i + 1}`, name, points: 0, played: 0 }));
 }
 
 /** Stable sort: more points first; equal points keep their previous order. */

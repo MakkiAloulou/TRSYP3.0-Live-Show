@@ -12,7 +12,7 @@ import TeamPanel from "./TeamPanel";
 
 const STAGE_W = 1920;
 const STAGE_H = 1080;
-const STORAGE_KEY = "trsyp3-polygame-v3";
+const STORAGE_KEY = "trsyp3-polygame-v4"; // v4: fresh leaderboard start (CUBOT 6th, all on 0)
 
 /* Keyboard map by the letter printed on the key (works on AZERTY and QWERTY;
    caps lock / Shift don't matter). Shift + points key = ±5. */
