@@ -554,6 +554,9 @@ function baseReducer(s: GameState, a: Action): GameState {
       };
     case "load":
       return normalizeState(a.state);
+    default:
+      // unknown action (e.g. an old page still open during an update): change nothing
+      return s;
   }
 }
 
