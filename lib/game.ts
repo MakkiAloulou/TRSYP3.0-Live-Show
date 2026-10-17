@@ -306,7 +306,7 @@ const shear = (pts: [number, number][]): [number, number][] =>
 export const BOARD_W = COL_W * 5 + (TRI_H * 2 + CUBE_H) * SHEAR;
 export const BOARD_H = TRI_H * 2 + CUBE_H;
 
-const RENUMBER: Record<number, number> = { 8: 11, 11: 8, 20: 23, 23: 20 };
+const RENUMBER: Record<number, number> = { 8: 11, 11: 8, 23: 26, 26: 23 };
 export const SHAPES: ShapeDef[] = Array.from({ length: 5 }, (_, c) => {
   const x = c * COL_W;
   const r = x + COL_W;
@@ -327,7 +327,7 @@ export const SHAPES: ShapeDef[] = Array.from({ length: 5 }, (_, c) => {
   ] satisfies ShapeDef[];
 })
   .flat()
-  // the real board's numbers: the cubes of columns 2 and 4 swap theirs (8 ↔ 11, 20 ↔ 23)
+  // the real board's numbers: 8 ↔ 11 (column 2's cubes) and 23 ↔ 26 (column 4's blue cube, column 5's red one)
   .map((s) => (s.num !== null && RENUMBER[s.num] ? { ...s, num: RENUMBER[s.num] } : s));
 
 /* ─── State ─────────────────────────────────────────────────────────── */

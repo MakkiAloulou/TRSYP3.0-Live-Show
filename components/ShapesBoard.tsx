@@ -10,18 +10,20 @@ interface Props {
   onPieceDown?: (id: string, e: React.PointerEvent) => void;
   /** remote freeze picker: pieces chosen so far */
   selected?: string[];
+  /** team 2 (right): its board is the mirror image of team 1's */
+  mirror?: boolean;
 }
 
 const PAD = 6;
 
-/* The 35 pieces, top view.
+/* The 35 pieces, top view (team 2's mirrored, as the two teams face each other).
    normal  = its colour, on the board
    grey    = used: placed on the grid
    frozen  = locked by a pin: covered in ice, can't be used (it crystallises
              in when it's frozen, one piece after another)
    removed = knocked off (dashed outline; older saves)
    Screen only: left click removes / brings back, right click greys / restores. */
-export default function ShapesBoard({ shapes, onChange, onPieceDown, selected = [] }: Props) {
+export default function ShapesBoard({ shapes, onChange, onPieceDown, selected = [], mirror = false }: Props) {
   const frozenOrder = SHAPES.filter((s) => shapes[s.id] === "frozen").map((s) => s.id);
   return (
     <svg
@@ -42,9 +44,10 @@ export default function ShapesBoard({ shapes, onChange, onPieceDown, selected = 
         const removed = st === "removed";
         const frozen = st === "frozen";
         const picked = selected.includes(s.id);
-        const pts = s.points.map((p) => p.join(",")).join(" ");
-        const cx = s.points.reduce((t, p) => t + p[0], 0) / s.points.length;
-        const cy = s.points.reduce((t, p) => t + p[1], 0) / s.points.length;
+        const points = mirror ? s.points.map(([x, y]) => [BOARD_W - x, y]) : s.points;
+        const pts = points.map((p) => p.join(",")).join(" ");
+        const cx = points.reduce((t, p) => t + p[0], 0) / points.length;
+        const cy = points.reduce((t, p) => t + p[1], 0) / points.length;
         const order = frozenOrder.indexOf(s.id);
         return (
           <g key={s.id}>

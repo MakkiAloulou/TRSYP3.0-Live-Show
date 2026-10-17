@@ -125,6 +125,7 @@ export default function TeamPanel({ id, team, opponent, dispatch, active, varian
             <Label>Shapes</Label>
             <div className="min-h-0 flex-1 pt-1">
               <ShapesBoard
+                mirror={id === 1}
                 shapes={team.shapes}
                 onChange={(sid, state) => dispatch({ type: "setShape", team: id, id: sid, state })}
               />

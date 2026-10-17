@@ -865,6 +865,7 @@ function TeamControls({
       {picking && (
         <FreezePicker
           team={team}
+          mirror={id === 1}
           onCancel={() => setPicking(false)}
           onValidate={(ids) => {
             act({ type: "pin", team: id, freeze: ids });
@@ -888,7 +889,9 @@ function TeamControls({
 }
 
 /** Pinning a team: tap 4 of its unused pieces, then Validate. The screen pins the team and freezes them. */
-function FreezePicker({ team, onCancel, onValidate }: { team: TeamState; onCancel: () => void; onValidate: (ids: string[]) => void }) {
+function FreezePicker({
+  team, mirror, onCancel, onValidate,
+}: { team: TeamState; mirror: boolean; onCancel: () => void; onValidate: (ids: string[]) => void }) {
   const [sel, setSel] = useState<string[]>([]);
   const free = SHAPES.filter((p) => p.kind !== "green" && (team.shapes[p.id] ?? "normal") === "normal");
   const need = Math.min(4, free.length);
@@ -898,6 +901,7 @@ function FreezePicker({ team, onCancel, onValidate }: { team: TeamState; onCance
       <div className="text-[14px] text-[var(--text-dim)]">Tap {need} unused pieces to freeze. They can&apos;t be used for the rest of the match.</div>
       <div className="mt-4 select-none [touch-action:manipulation]">
         <ShapesBoard
+          mirror={mirror}
           shapes={team.shapes}
           selected={sel}
           onChange={() => {}}
@@ -968,14 +972,20 @@ function RemoteTimer({ timer, offset, since = 0, className = "text-[34px]" }: { 
 }
 
 /** A piece drawn on its own (for the dragged ghost and the diagonal question). */
-function PieceIcon({ id, size }: { id: string; size: number }) {
+function PieceIcon({ id, size, mirror = false }: { id: string; size: number; mirror?: boolean }) {
   const def = SHAPES.find((s) => s.id === id)!;
   const xs = def.points.map((p) => p[0]);
   const ys = def.points.map((p) => p[1]);
   const [x0, y0] = [Math.min(...xs), Math.min(...ys)];
   const [w, h] = [Math.max(...xs) - x0, Math.max(...ys) - y0];
   return (
-    <svg width={size} height={size} viewBox={`${x0 - 4} ${y0 - 4} ${Math.max(w, h) + 8} ${Math.max(w, h) + 8}`} aria-hidden>
+    <svg
+      width={size}
+      height={size}
+      viewBox={`${x0 - 4} ${y0 - 4} ${Math.max(w, h) + 8} ${Math.max(w, h) + 8}`}
+      style={mirror ? { transform: "scaleX(-1)" } : undefined}
+      aria-hidden
+    >
       <polygon points={def.points.map((p) => p.join(",")).join(" ")} fill={SHAPE_COLORS[def.kind]} stroke="#1b1430" strokeWidth={2} strokeLinejoin="round" />
     </svg>
   );
@@ -1086,7 +1096,7 @@ function Boards({ state, act }: { state: GameState; act: Act }) {
       </p>
       {/* touch-action none: a finger on the board drags a piece instead of scrolling the page */}
       <div className="w-full select-none [-webkit-touch-callout:none] [touch-action:none]">
-        <ShapesBoard shapes={t.shapes} onChange={() => {}} onPieceDown={pieceDown} />
+        <ShapesBoard mirror={team === 1} shapes={t.shapes} onChange={() => {}} onPieceDown={pieceDown} />
       </div>
       <div ref={gridRef} className="mx-auto mt-4 aspect-square w-full max-w-[360px]">
         <ColorGrid
@@ -1105,14 +1115,14 @@ function Boards({ state, act }: { state: GameState; act: Act }) {
       {/* the piece under the finger, lifted above it so it stays visible */}
       {drag && (
         <div className="pointer-events-none fixed z-50 drop-shadow-[0_10px_20px_rgba(0,0,0,0.6)]" style={{ left: drag.x - 36, top: drag.y - 96 }}>
-          <PieceIcon id={drag.id} size={72} />
+          <PieceIcon id={drag.id} size={72} mirror={team === 1} />
         </div>
       )}
 
       {ask && askDef && (
         <Sheet onClose={() => setAsk(null)}>
           <div className="flex items-center gap-4">
-            <PieceIcon id={ask.id} size={48} />
+            <PieceIcon id={ask.id} size={48} mirror={team === 1} />
             <div>
               <div className="name text-[16px] text-white">Which triangle?</div>
               <div className="text-[14px] text-[var(--text-dim)]">
@@ -1146,7 +1156,7 @@ function Boards({ state, act }: { state: GameState; act: Act }) {
       {green && (
         <Sheet onClose={() => setGreen(null)}>
           <div className="flex items-center gap-4">
-            <PieceIcon id={green} size={48} />
+            <PieceIcon id={green} size={48} mirror={team === 1} />
             {t.greens?.[green] !== undefined ? (
               <div>
                 <div className="name text-[16px] text-white">Green triangle played</div>
