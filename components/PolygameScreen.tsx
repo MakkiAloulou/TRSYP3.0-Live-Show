@@ -455,6 +455,11 @@ export default function PolygameScreen() {
     setLayer(logoRef.current, 1, 1, 0);
     if (!listOpenRef.current) {
       resetFlow();
+      // opening a match faded the line-up out and zoomed it: put it back, or it would
+      // count as open while the match underneath shows through
+      setLayer(listRef.current, 1, 1, 0);
+      if (listRef.current) listRef.current.style.transformOrigin = "";
+      hideZoom();
       listOpenRef.current = true;
       setListOpen(true);
     }
