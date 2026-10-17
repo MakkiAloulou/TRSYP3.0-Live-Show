@@ -123,10 +123,13 @@ export default function Controller() {
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const [seenAt, setSeenAt] = useState(0);
   const [offset, setOffset] = useState(0);
+  // when each screen page on this key last answered (two would both follow every command)
+  const [screens, setScreens] = useState<Record<string, number>>({});
   const { send, status } = useLink<Snapshot>(key, "control", (s) => {
     setSnap(s);
     setSeenAt(Date.now());
     setOffset(Date.now() - s.sentAt);
+    if (s.screenId) setScreens((m) => ({ ...m, [s.screenId!]: Date.now() }));
   });
 
   // the screen sends a heartbeat every 4 s; quiet for 10 s = not there
@@ -136,6 +139,7 @@ export default function Controller() {
     return () => clearInterval(iv);
   }, []);
   const online = status === "live" && now - seenAt < 10000;
+  const screenCount = Object.values(screens).filter((t) => now - t < 10000).length;
 
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
   const [homolDraft, setHomolDraft] = useState<Record<string, string>>({});
@@ -216,7 +220,7 @@ export default function Controller() {
     if (view === "game") stats?.send();
     // revealing the homologation scores: they go to the screen with that step
     if (view === "homologation" && (snap?.screen.homol ?? 0) === 0) homol?.send();
-    cmd({ type: "next" });
+    cmd({ type: "next", from: view, homol: snap?.screen.homol ?? 0 });
   };
 
   return (
@@ -261,13 +265,18 @@ export default function Controller() {
               Key
             </button>
           </div>
+          {screenCount > 1 && (
+            <div className="mt-2.5 rounded-xl border border-[rgba(242,85,107,0.55)] bg-[rgba(242,85,107,0.1)] px-3 py-2 text-[13px] leading-snug text-[var(--cell-red)]" role="alert">
+              {screenCount} screens are open with this key and {screenCount === 2 ? "both" : "all"} follow your commands. Close the extra one (another tab, another PC, or an OBS browser source).
+            </div>
+          )}
         </header>
       }
       footer={
         snap && (
           <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-white/[0.06] bg-[#010008]/90 px-3 pb-[max(12px,env(safe-area-inset-bottom))] pt-3 backdrop-blur-md">
             <div className="mx-auto grid max-w-[960px] grid-cols-[1fr_2.4fr_1fr] gap-2">
-              <button className="ctl-btn px-2" disabled={view === "logo" || overlay} onClick={() => cmd({ type: "prev" })}>
+              <button className="ctl-btn px-2" disabled={view === "logo" || overlay} onClick={() => cmd({ type: "prev", from: view, homol: snap?.screen.homol ?? 0 })}>
                 <Chevron dir="left" /> Back
               </button>
               <button

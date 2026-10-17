@@ -763,9 +763,11 @@ export default function PolygameScreen() {
         return;
       }
       case "next":
-        return L.doNext();
       case "prev":
-        return L.doPrev();
+        // meant for what the remote saw on screen: if this screen shows something else (another
+        // screen on the same key, or a tap repeated while a transition runs), it isn't for this one
+        if (c.from && (busy.current || c.from !== L.viewNow() || (c.from === "homologation" && c.homol !== homolStepRef.current))) return;
+        return c.type === "next" ? L.doNext() : L.doPrev();
       case "home":
         return void L.toLogo();
       case "stage":
@@ -783,11 +785,13 @@ export default function PolygameScreen() {
     }
   };
   const { send } = useLink<Command>(remoteKey, "screen", (c) => onCommand(c));
+  // tells this page apart from any other screen open on the same key
+  const [screenId] = useState(() => Math.random().toString(36).slice(2, 10));
 
   // Tell the controllers what's on screen: after every change (once things
   // settle for 100 ms), when one says hello, and every few seconds as a heartbeat.
   useEffect(() => {
-    const t = setTimeout(() => send({ state: compact(state), screen, sentAt: Date.now() }), 100);
+    const t = setTimeout(() => send({ state: compact(state), screen, sentAt: Date.now(), screenId }), 100);
     return () => clearTimeout(t);
   }, [state, screenView, boardOpen, pulse, homolStep]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {

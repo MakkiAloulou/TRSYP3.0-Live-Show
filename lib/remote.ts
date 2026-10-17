@@ -28,8 +28,9 @@ export type Command =
   | { type: "hello" }
   | { type: "action"; action: Action }
   /** the next step of the show (see lib/flow.ts) */
-  | { type: "next" }
-  | { type: "prev" }
+  // `from`: what the screen showed when it was pressed; a screen showing something else ignores it
+  | { type: "next"; from?: View; homol?: 0 | 1 | 2 }
+  | { type: "prev"; from?: View; homol?: 0 | 1 | 2 }
   /** straight back to the logo */
   | { type: "home" }
   /** jump to a stage's title card (corrections; the show order is automatic) */
@@ -44,6 +45,8 @@ export interface Snapshot {
   screen: Screen;
   /** the screen's clock when sent (controllers show timers from it) */
   sentAt: number;
+  /** this screen page (a second one on the same key has another) */
+  screenId?: string;
 }
 
 /** The game without the boards of matches that aren't open (the controller never shows those). */
