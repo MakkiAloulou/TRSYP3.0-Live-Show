@@ -1,4 +1,4 @@
-import { HOMOL_MAX, type GameKind } from "@/lib/game";
+import { HOMOL_MAX, LEAGUE_SLOTS, type GameKind } from "@/lib/game";
 import { RAIL } from "@/lib/flow";
 
 /* A stage's opener: 00 Homologation, then each game. The title builds itself
@@ -11,8 +11,8 @@ type Stage = "homologation" | GameKind;
 
 const SUB: Record<Stage, string> = {
   homologation: `Every robot checked against the technical specs · up to ${HOMOL_MAX} points`,
-  polygame: "League · 4 matches",
-  garden: "League · 4 matches",
+  polygame: `League · ${LEAGUE_SLOTS} matches`,
+  garden: `League · ${LEAGUE_SLOTS} matches`,
   game3: "Semi-finals in Mine · 3rd place and final in Polygame",
 };
 

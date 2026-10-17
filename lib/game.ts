@@ -97,7 +97,7 @@ export const GLITCH_CARDS: { id: GlitchId; name: string; secs: number; color: "p
   { id: "onehand", name: "One Hand Control", secs: 15, color: "green", art: "/glitch/one-hand.png" },
 ];
 
-/** One of the 8 teams on the overall leaderboard */
+/** One of the teams on the overall leaderboard */
 export interface LeagueTeam {
   id: string;
   name: string;
@@ -150,17 +150,20 @@ export const cupGame = (r: CupRound): GameKind => (r === "sf1" || r === "sf2" ? 
 /** A cup match's slot: the game its round is played in. */
 export const cupSlot = (m: Match) => m.games[cupGame(m.cup!)];
 export const cupId = (r: CupRound) => `cup-${r}`;
-/* The competition's eight teams, in the admin portal's order (ids t1…t8). */
-const TEAMS: { name: string; branch: string; logo: string }[] = [
+/* The competition's teams, in the admin portal's order (ids t1…t8, kept even
+   for teams that are out, so ids and logos never shift). */
+const TEAMS: { name: string; branch: string; logo: string; out?: true }[] = [
   { name: "IEEE RAS ENSIT", branch: "ENSIT SB", logo: "ensit" },
   { name: "HANNIBAL", branch: "ENICarthage SB", logo: "enicarthage" },
-  { name: "AUTOBOTS", branch: "ESPRIT SB", logo: "esprit" },
+  { name: "AUTOBOTS", branch: "ESPRIT SB", logo: "esprit", out: true }, // disqualified
   { name: "LONE WOLVES", branch: "IIT SB", logo: "iit" },
   { name: "SYNAPTECH", branch: "ISTMT SB", logo: "istmt" },
-  { name: "HEPTABOT", branch: "ENETCom SB", logo: "enetcom" },
+  { name: "HEPTABOT", branch: "ENETCom SB", logo: "enetcom", out: true }, // disqualified
   { name: "SPARK", branch: "ENIG SB", logo: "enig" },
   { name: "NEXORA", branch: "ENIG SB", logo: "enig" },
 ];
+/** The ids of the teams still in the competition. */
+const PLAYING = TEAMS.flatMap((t, i) => (t.out ? [] : [`t${i + 1}`]));
 
 /** A league team's IEEE student branch and its logo (public/branches), as on the draw. */
 export const teamBranch = (leagueId: string | undefined) => {
@@ -169,12 +172,12 @@ export const teamBranch = (leagueId: string | undefined) => {
 };
 
 /* The league draw made on the admin portal's /draw (saved 15 Oct 2026):
-   each pair is [green corner, pink corner] = [team 1, team 2]. */
+   each pair is [green corner, pink corner] = [team 1, team 2]. AUTOBOTS and
+   HEPTABOT were disqualified, so their opponents (HANNIBAL, NEXORA) meet. */
 const DRAW: [string, string][] = [
   ["t4", "t1"], // LONE WOLVES vs IEEE RAS ENSIT
-  ["t2", "t3"], // HANNIBAL vs AUTOBOTS
+  ["t2", "t8"], // HANNIBAL vs NEXORA
   ["t5", "t7"], // SYNAPTECH vs SPARK
-  ["t8", "t6"], // NEXORA vs HEPTABOT
 ];
 export const LEAGUE_SLOTS = DRAW.length;
 export type MatchStatus = "upcoming" | "live" | "done";
@@ -396,15 +399,16 @@ const newMatch = (league: LeagueTeam[], id: string, num: number, a: string, b: s
   },
 });
 
-/** The 4 league matches from the draw (fixed ids m1…m4 so server and client render the same) */
+/** The league matches from the draw (fixed ids m1… so server and client render the same) */
 const leagueSlots = (league: LeagueTeam[], chances: number): Match[] =>
   DRAW.map(([a, b], i) => newMatch(league, `m${i + 1}`, i + 1, a, b, chances));
 
-/** A save from before the real teams and the draw (9 placeholder teams / 9 slots) is not loaded. */
+/** A save made with other teams (e.g. before the disqualifications) is not loaded.
+    Pairs edited by hand are kept: only the teams and the number of matches are checked. */
 const isCurrentSave = (s: GameState) =>
   Array.isArray(s.league) &&
-  s.league.length === TEAMS.length &&
-  TEAMS.every((_, i) => s.league.some((l) => l.id === `t${i + 1}`)) &&
+  s.league.length === PLAYING.length &&
+  PLAYING.every((id) => s.league.some((l) => l.id === id)) &&
   Array.isArray(s.matches) &&
   s.matches.filter((m) => !m.cup).length === LEAGUE_SLOTS;
 
@@ -530,7 +534,7 @@ export const cumulative = (m: Match, game: GameKind, team: TeamId) =>
   slotCarry(m, game, team) + gameScore(game, m.games[game].teams[team]);
 
 function freshLeague(): LeagueTeam[] {
-  return TEAMS.map(({ name }, i) => ({ id: `t${i + 1}`, name, points: 0, played: 0 }));
+  return TEAMS.flatMap(({ name, out }, i) => (out ? [] : [{ id: `t${i + 1}`, name, points: 0, played: 0 }]));
 }
 
 /** Stable sort: more points first; equal points keep their previous order. */

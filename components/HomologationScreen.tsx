@@ -6,7 +6,7 @@ import Branch from "./Branch";
 import { CountUp, Frame, Line, Reveal, ScreenTitle } from "./Draw";
 
 /* Homologation results, before any game: each team's score out of 50 for
-   meeting the technical specs. Eight rows in two columns, each with a bar
+   meeting the technical specs. The teams in two columns, each with a bar
    that fills to the score while the number counts up. Teams in their league
    order (t1…t8), so nobody reads a ranking into the layout; the leaderboard
    that follows ranks them. */
@@ -17,13 +17,16 @@ const Y0 = 60;
 const Y1 = 1020;
 const TITLE_Y = 212;
 const ROW0 = 286;
-const ROW_H = 168;
+const BLOCK_H = 672; // the two columns of cards share this height
 const COL_W = 700;
 const GAP = 80;
 
 export default function HomologationScreen({ on, state }: { on: boolean; state: GameState }) {
   const teams = [...state.league].sort((a, b) => parseInt(a.id.slice(1)) - parseInt(b.id.slice(1)));
   const left0 = (1920 - (COL_W * 2 + GAP)) / 2;
+  const perCol = Math.ceil(teams.length / 2);
+  const ROW_H = Math.min(200, Math.floor(BLOCK_H / perCol));
+  const top0 = ROW0 + (BLOCK_H - perCol * ROW_H) / 2;
   return (
     <div className="absolute inset-0" aria-hidden={!on}>
       <svg className="pointer-events-none absolute inset-0" width={1920} height={1080}>
@@ -35,14 +38,14 @@ export default function HomologationScreen({ on, state }: { on: boolean; state: 
       <ScreenTitle on={on} x0={X0} x1={X1} y0={Y0} y1={TITLE_Y} title="Homologation" />
 
       {teams.map((t, i) => {
-        const col = Math.floor(i / 4);
-        const row = i % 4;
+        const col = Math.floor(i / perCol);
+        const row = i % perCol;
         const pts = homolPoints(state.homologation[t.id]);
         const scored = (state.homologation[t.id] ?? "") !== "";
         const d = 520 + i * 110;
         const full = pts === HOMOL_MAX;
         return (
-          <Reveal key={t.id} on={on} d={d} className="absolute" style={{ left: left0 + col * (COL_W + GAP), top: ROW0 + row * ROW_H, width: COL_W, height: ROW_H - 26 }}>
+          <Reveal key={t.id} on={on} d={d} className="absolute" style={{ left: left0 + col * (COL_W + GAP), top: top0 + row * ROW_H, width: COL_W, height: ROW_H - 26 }}>
             <div className="panel flex h-full flex-col justify-center gap-4 px-7" style={{ "--r": "20px" } as CSSProperties}>
               <div className="flex items-center gap-5">
                 <Branch id={t.id} height={46} />

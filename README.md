@@ -21,11 +21,12 @@ The order is fixed. On the remote, **Next** always does the next thing and says 
 1. **Logo**: the TRSYP logo, big.
 2. **00 · Homologation**: done once, before any game.
    Each robot is checked against the technical specs and gets **0–50 points**.
-   - Type the eight scores on the remote. You can do this in advance while the logo is up.
+   - Type the six scores on the remote. You can do this in advance while the logo is up.
    - Next plays the opener, then **shows the scores**: they count up with a bar per team.
    - The points go into the league table at that moment. Next then shows the **leaderboard** with a `+N` badge per team.
    - To correct a score later, change it and press **Update on screen**. Only the difference is applied.
-3. **01 · Polygame**: title card → line-up of the 4 league matches (pairs from the admin-portal draw).
+3. **01 · Polygame**: title card → line-up of the 3 league matches.
+   - The pairs come from the admin-portal draw. AUTOBOTS and HEPTABOT were disqualified, so their opponents, HANNIBAL and NEXORA, play each other.
    - Each match is played with its 3 phases in one go: live screen → Phase Stats → Game Stats → leaderboard → back to the line-up.
 4. **02 · Garden**: same pairs, same flow. Its Game Stats details screen shows time, position and the final score.
 5. **03 · Champions Cup**: the league's top 4, always **1st v 4th** and **2nd v 3rd**.

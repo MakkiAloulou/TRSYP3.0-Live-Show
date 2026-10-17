@@ -6,7 +6,7 @@ import { Frame, Line, Reveal, ScreenTitle } from "./Draw";
 import Branch from "./Branch";
 import Panel from "./Panel";
 
-/* Overall leaderboard of all 8 teams. Opens on the current standings; if this
+/* Overall leaderboard of all the teams. Opens on the current standings; if this
    match hasn't been added yet, 3 s later the two teams' points tick up, a +N
    badge pops, and rows slide to their new places with ▲/▼ markers. */
 
@@ -17,8 +17,7 @@ const Y1 = 1020;
 const TITLE_Y = 212;
 const HEAD_Y = 228; // column header band
 const ROW0 = 290;
-const ROW_H = 82;
-const ROWS = 8;
+const TABLE_H = 656; // the rows share this height (8 × 82 when there were eight teams)
 
 // columns (stage px)
 const C_RANK = 210;
@@ -94,6 +93,9 @@ export default function LeaderboardScreen({ on, active, state, dispatch, readOnl
   const playing = new Set(readOnly ? [] : Object.keys(matchGains(state)));
   // which corner each of this match's teams played in (green = team 1, pink = team 2)
   const cornerOf = (id: string) => state.teams.findIndex((t) => t.leagueId === id);
+
+  const ROWS = league.length;
+  const ROW_H = Math.min(108, Math.floor(TABLE_H / ROWS));
 
   return (
     <div className="absolute inset-0" aria-hidden={!on}>

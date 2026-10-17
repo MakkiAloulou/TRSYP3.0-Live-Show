@@ -39,7 +39,7 @@ export default function MatchesScreen({ on, state, onOpen }: Props) {
   const matches = leagueMatches(state);
   const nextId = nextMatchId(state, state.game);
 
-  // 4 matches: a 2 × 2 grid, centred in the space under the title
+  // two per row, centred in the space under the title (an odd last one centred too)
   const cols = 2;
   const rows = Math.ceil(matches.length / cols);
   const gap = 56; // room for the legends on the cards' top and bottom edges
@@ -68,13 +68,15 @@ export default function MatchesScreen({ on, state, onOpen }: Props) {
       {matches.map((m, i) => {
         const col = i % cols;
         const row = Math.floor(i / cols);
+        const inRow = Math.min(cols, matches.length - row * cols);
+        const shift = ((cols - inRow) * (cardW + gap)) / 2;
         return (
           <Reveal
             key={m.id}
             on={on}
             d={480 + i * 60}
             className="absolute"
-            style={{ left: X0 + 60 + col * (cardW + gap), top: gridTop + row * (cardH + gap), width: cardW, height: cardH }}
+            style={{ left: X0 + 60 + shift + col * (cardW + gap), top: gridTop + row * (cardH + gap), width: cardW, height: cardH }}
           >
             <Card
               match={m}
