@@ -1,23 +1,19 @@
 import type { Metadata } from "next";
-import { Chakra_Petch, Russo_One, Share_Tech_Mono } from "next/font/google";
+import { Host_Grotesk, Orbitron } from "next/font/google";
 import "./globals.css";
 
-const body = Chakra_Petch({
+// The TRSYP 3.0 pair, as on the admin portal's venue screens:
+// Orbitron for headings and names, Host Grotesk for everything else.
+const body = Host_Grotesk({
   variable: "--font-body",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
 });
 
-const display = Russo_One({
+const display = Orbitron({
   variable: "--font-display",
   subsets: ["latin"],
-  weight: "400",
-});
-
-const mono = Share_Tech_Mono({
-  variable: "--font-digits",
-  subsets: ["latin"],
-  weight: "400",
+  weight: ["500", "600", "700", "800"],
 });
 
 export const metadata: Metadata = {
@@ -31,7 +27,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${body.variable} ${display.variable} ${mono.variable}`}>
+    <html lang="en" className={`${body.variable} ${display.variable}`}>
       <body>{children}</body>
     </html>
   );

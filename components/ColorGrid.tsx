@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { toCell, type GridCell, type GridColor } from "@/lib/game";
+import { toCell, type Diag, type GridCell, type GridColor } from "@/lib/game";
 
 const FILL: Record<GridColor, string> = {
   0: "var(--cell-white)",
@@ -10,14 +10,24 @@ const FILL: Record<GridColor, string> = {
 };
 const NAME: Record<GridColor, string> = { 0: "white", 1: "red", 2: "blue" };
 
-// Each square is split on its "\" diagonal into two triangles.
+/** The two triangles of a square, for each diagonal (10 × 10 box). */
+export const HALVES: Record<Diag, { h: 0 | 1; pts: string; cx: number; cy: number; name: string }[]> = {
+  "\\": [
+    { h: 0, pts: "0,0 10,0 10,10", cx: 6.9, cy: 3.1, name: "top-right" },
+    { h: 1, pts: "0,0 10,10 0,10", cx: 3.1, cy: 6.9, name: "bottom-left" },
+  ],
+  "/": [
+    { h: 0, pts: "0,0 10,0 0,10", cx: 3.1, cy: 3.1, name: "top-left" },
+    { h: 1, pts: "10,0 10,10 0,10", cx: 6.9, cy: 6.9, name: "bottom-right" },
+  ],
+};
+export const DIAG_LINE: Record<Diag, [number, number, number, number]> = { "\\": [0, 0, 10, 10], "/": [10, 0, 0, 10] };
+
+// Each square is split on its diagonal (either way) into two triangles.
 // Left click  → whole square (white → red → blue → white), no diagonal shown
 // Right click → only the triangle under the cursor, diagonal stays visible
 // Hover + type digits → number on the square (full) or on the hovered triangle (split)
-const HALVES: { h: 0 | 1; pts: string; cx: number; cy: number }[] = [
-  { h: 0, pts: "0,0 10,0 10,10", cx: 6.9, cy: 3.1 }, // top-right
-  { h: 1, pts: "0,0 10,10 0,10", cx: 3.1, cy: 6.9 }, // bottom-left
-];
+// Every square carries data-cell={index}, so a dragged piece can find where it lands.
 
 interface Props {
   grid: GridCell[];
@@ -25,9 +35,11 @@ interface Props {
   onHalf: (index: number, half: 0 | 1) => void;
   onKey: (index: number, half: 0 | 1, key: string) => void;
   active: boolean;
+  /** a square to ring (a piece is being dragged over it) */
+  highlight?: number | null;
 }
 
-export default function ColorGrid({ grid, onCell, onHalf, onKey, active }: Props) {
+export default function ColorGrid({ grid, onCell, onHalf, onKey, active, highlight = null }: Props) {
   const hover = useRef<{ i: number; h: 0 | 1 } | null>(null);
   const onKeyRef = useRef(onKey);
   const activeRef = useRef(active);
@@ -63,17 +75,28 @@ export default function ColorGrid({ grid, onCell, onHalf, onKey, active }: Props
         const [a, b] = cell.colors;
         const coloured = a !== 0 || b !== 0;
         const glow = cell.full ? `0 0 10px ${FILL[a]}` : "none";
+        const halves = HALVES[cell.diag];
+        const [x1, y1, x2, y2] = DIAG_LINE[cell.diag];
         return (
-          <div key={i} className="relative" style={{ boxShadow: glow }}>
+          <div
+            key={i}
+            data-cell={i}
+            className="relative overflow-hidden rounded-[3px] transition-[outline-color] duration-100"
+            style={{
+              boxShadow: glow,
+              outline: highlight === i ? "3px solid var(--green)" : "3px solid transparent",
+              outlineOffset: 1,
+            }}
+          >
             <svg viewBox="0 0 10 10" className="block h-full w-full" aria-label={`Square ${i + 1}`}>
               {/* A full square is painted as ONE rect, so no seam can appear between the halves */}
               {cell.full && <rect width="10" height="10" fill={FILL[a]} pointerEvents="none" />}
-              {HALVES.map(({ h, pts }) => (
+              {halves.map(({ h, pts, name }) => (
                 <polygon
                   key={h}
                   points={pts}
                   role="button"
-                  aria-label={`Square ${i + 1} ${h === 0 ? "top-right" : "bottom-left"}: ${NAME[cell.colors[h]]}`}
+                  aria-label={`Square ${i + 1} ${name}: ${NAME[cell.colors[h]]}`}
                   // halves stay as (invisible) click targets on a full square
                   fill={cell.full ? "transparent" : FILL[cell.colors[h]]}
                   className="cursor-pointer transition-[fill] duration-150"
@@ -88,24 +111,22 @@ export default function ColorGrid({ grid, onCell, onHalf, onKey, active }: Props
               {/* Diagonal: hidden on a full square, faint on a blank one, strong on a split coloured one */}
               {!cell.full && (
                 <line
-                  x1="0"
-                  y1="0"
-                  x2="10"
-                  y2="10"
+                  x1={x1}
+                  y1={y1}
+                  x2={x2}
+                  y2={y2}
                   stroke={coloured ? "#06120d" : "rgba(2,7,5,0.18)"}
                   strokeWidth={coloured ? 0.45 : 0.15}
                   pointerEvents="none"
                 />
               )}
-              {cell.full ? (
-                cell.label && <Label x={5} y={5.2} size={4.6} text={cell.label} />
-              ) : (
-                HALVES.map(({ h, cx, cy }) =>
-                  cell.halfLabels[h] ? (
-                    <Label key={h} x={cx} y={cy} size={2.9} text={cell.halfLabels[h]} dark={cell.colors[h] === 0} />
-                  ) : null,
-                )
-              )}
+              {cell.full
+                ? cell.label && <Label x={5} y={5.2} size={4.6} text={cell.label} />
+                : halves.map(({ h, cx, cy }) =>
+                    cell.halfLabels[h] ? (
+                      <Label key={h} x={cx} y={cy} size={2.9} text={cell.halfLabels[h]} dark={cell.colors[h] === 0} />
+                    ) : null,
+                  )}
             </svg>
           </div>
         );

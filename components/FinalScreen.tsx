@@ -2,8 +2,7 @@
 
 import { useEffect, useState, type CSSProperties } from "react";
 import { type TeamId, type TeamState } from "@/lib/game";
-import { sfx } from "@/lib/sfx";
-import { CountUp, DrawPath, framePath, Line, Reveal, timing } from "./Draw";
+import { CountUp, DrawPath, Frame, Line, Reveal, ScreenTitle, timing } from "./Draw";
 
 /* Game Stats: both teams' total score (from Phase Stats). 6 s after the
    screen comes in, the dominant team is revealed: the line expands, the
@@ -14,7 +13,6 @@ const X1 = 1770;
 const Y0 = 60;
 const Y1 = 1020;
 const MID = 960;
-const CUT = 28;
 const TITLE_Y = 212;
 const SPLIT_Y = 640;
 const PAD = 70;
@@ -34,6 +32,7 @@ interface Props {
   teams: [TeamState, TeamState];
   /** Cumulative scores (carried from earlier games + this one) */
   totals: [number, number];
+  /** the game being played, for the score label */
   title: string;
 }
 
@@ -44,12 +43,6 @@ export default function FinalScreen({ on, teams, totals, title }: Props) {
   useEffect(() => {
     const t = setTimeout(() => {
       setReveal(on);
-      if (!on) return;
-      // line → decoder chatter → slam + shockwave shimmer
-      sfx.rowSlide(T_LINE / 1000);
-      sfx.decode(0.95, T_CAPTION / 1000);
-      sfx.slam(T_SLAM / 1000);
-      sfx.shimmer((T_SLAM + 120) / 1000);
     }, on ? REVEAL_AFTER_MS : 0);
     return () => clearTimeout(t);
   }, [on]);
@@ -61,28 +54,21 @@ export default function FinalScreen({ on, teams, totals, title }: Props) {
     <div className={`absolute inset-0 ${showReveal ? "shake" : ""}`} style={v(T_SLAM + 60)} aria-hidden={!on}>
       {/* ── Lines ── */}
       <svg className="pointer-events-none absolute inset-0" width={1920} height={1080}>
-        <g fill="none" strokeLinecap="square">
-          <DrawPath on={on} d={0} dur={1100} path={framePath(X0, Y0, X1, Y1, CUT)} glow="drop-shadow(0 0 5px rgba(41,224,143,0.85))" />
+        <g fill="none" strokeLinecap="round">
+          <Frame on={on} x0={X0} y0={Y0} x1={X1} y1={Y1} />
           <Line on={on} d={260} dur={700} x1={X0} y1={TITLE_Y} x2={X1} y2={TITLE_Y} strong />
           <Line on={on} d={460} dur={600} x1={MID} y1={TITLE_Y} x2={MID} y2={SPLIT_Y} strong />
           <Line on={on} d={700} dur={700} x1={X0} y1={SPLIT_Y} x2={X1} y2={SPLIT_Y} strong />
           {([0, 1] as TeamId[]).map((t) => {
             const [a, b] = halfX(t);
             const c = (a + b) / 2;
-            return <Line key={t} on={on} d={1000 + t * 60} dur={420} x1={c - 120} y1={SPLIT_Y - 44} x2={c + 120} y2={SPLIT_Y - 44} pink />;
+            return <DrawPath key={t} on={on} d={1000 + t * 60} dur={420} path={`M ${c - 120} ${SPLIT_Y - 44} H ${c + 120}`} stroke={t ? "var(--pink)" : "var(--green)"} width={2} />;
           })}
         </g>
       </svg>
 
       {/* ── Title ── */}
-      <Reveal on={on} d={320} className="absolute left-0 right-0 text-center" style={{ top: Y0 + 26 }}>
-        <div className="text-[15px] font-semibold uppercase tracking-[0.55em] text-[var(--text-dim)]">
-          TRSYP 3.0 · {title}
-        </div>
-        <h1 className="neon-text mt-1 font-[family-name:var(--font-display)] text-[68px] uppercase leading-none tracking-[0.22em]">
-          Game Stats
-        </h1>
-      </Reveal>
+      <ScreenTitle on={on} x0={X0} x1={X1} y0={Y0} y1={TITLE_Y} title="Game Stats" />
 
       {/* ── Team totals ── */}
       {([0, 1] as TeamId[]).map((t) => {
@@ -97,19 +83,19 @@ export default function FinalScreen({ on, teams, totals, title }: Props) {
             style={{ left: a, width: b - a, top: TITLE_Y + 44, opacity: isBehind ? 0.4 : 1 }}
           >
             <h2
-              className={`glitch neon-text reveal ${on ? "on" : ""} font-[family-name:var(--font-display)] text-[54px] uppercase leading-none tracking-[0.14em]`}
-              style={timing(on, 640 + o, 420)}
+              className={`glitch reveal ${on ? "on" : ""} name flex items-center gap-5 leading-none text-white`}
+              style={{ ...timing(on, 640 + o, 420), fontSize: teams[t].name.length > 11 ? 42 : 52 }}
             >
-              <span className="mr-4 inline-block h-3 w-3 -translate-y-2.5 rotate-45 bg-[var(--pink)] shadow-[0_0_8px_var(--pink)]" />
+              <span className={`diamond h-3 w-3 ${t ? "diamond--pink" : ""}`} />
               {teams[t].name}
-              <span className="ml-4 inline-block h-3 w-3 -translate-y-2.5 rotate-45 bg-[var(--pink)] shadow-[0_0_8px_var(--pink)]" />
+              <span className={`diamond h-3 w-3 ${t ? "diamond--pink" : ""}`} />
             </h2>
-            <Reveal on={on} d={820 + o} className="mt-12 text-[17px] font-semibold uppercase tracking-[0.5em] text-[var(--text-dim)]">
-              Total score
+            <Reveal on={on} d={820 + o} className="label mt-12 text-[17px]">
+              {title} score
             </Reveal>
             <Reveal on={on} d={880 + o}>
               <span
-                className={`digits mt-2 block text-[190px] leading-none ${isLeader ? "neon-text pulse-glow" : "pink-text"}`}
+                className={`digits mt-3 block text-[180px] font-bold leading-none ${t ? "pink-text" : "neon-text"} ${isLeader ? (t ? "pulse-glow pulse-glow--pink" : "pulse-glow") : ""}`}
                 style={v(T_SLAM + 200)}
               >
                 <CountUp value={totals[t]} on={on} delay={950 + o} ms={1500} />
@@ -120,25 +106,32 @@ export default function FinalScreen({ on, teams, totals, title }: Props) {
       })}
 
       {/* ── Dominant team reveal ── */}
-      {showReveal && <DominantReveal name={leader === null ? null : teams[leader].name} />}
+      {showReveal && <DominantReveal name={leader === null ? null : teams[leader].name} corner={leader} />}
     </div>
   );
 }
 
-function DominantReveal({ name }: { name: string | null }) {
+/** RGB of each corner: team 1 green, team 2 pink. */
+const RGB = ["0,232,122", "255,29,120"] as const;
+
+function DominantReveal({ name, corner }: { name: string | null; corner: TeamId | null }) {
   const cy = 860;
+  // the winner's colour leads, the other corner's is the accent; a draw is white with both
+  const main = corner === null ? "255,255,255" : RGB[corner];
+  const accent = corner === null ? RGB[1] : RGB[corner ? 0 : 1];
+  const c = (rgb: string, a = 1) => `rgba(${rgb},${a})`;
   const caption = name ? "The dominant team is" : "No dominant team";
   const headline = name ?? "It's a draw";
   return (
     <div className="pointer-events-none absolute inset-0">
       {/* line sweeping across the lower band */}
       <span
-        className="expand-x absolute h-[3px] bg-[var(--pink)] shadow-[0_0_14px_var(--pink)]"
-        style={{ left: X0 + 60, right: 1920 - X1 + 60, top: 742, ...v(T_LINE) }}
+        className="expand-x absolute h-[3px]"
+        style={{ left: X0 + 60, right: 1920 - X1 + 60, top: 742, background: c(main), boxShadow: `0 0 14px ${c(main)}`, ...v(T_LINE) }}
       />
 
       <div
-        className="absolute left-0 right-0 text-center text-[30px] font-semibold uppercase tracking-[0.55em] text-[var(--text)]"
+        className="absolute left-0 right-0 text-center text-[28px] font-semibold uppercase tracking-[0.3em] text-white"
         style={{ top: 686 }}
       >
         <Decode text={caption} startAfter={T_CAPTION} ms={950} />
@@ -146,12 +139,12 @@ function DominantReveal({ name }: { name: string | null }) {
 
       {/* shockwave rings + particle burst, centred on the name */}
       <span
-        className="shockwave absolute h-40 w-40 rounded-full border-[3px] border-[var(--pink)] shadow-[0_0_30px_var(--pink)]"
-        style={{ left: MID, top: cy, ...v(T_SLAM + 120) }}
+        className="shockwave absolute h-40 w-40 rounded-full border-[3px]"
+        style={{ left: MID, top: cy, borderColor: c(main), boxShadow: `0 0 30px ${c(main)}`, ...v(T_SLAM + 120) }}
       />
       <span
-        className="shockwave absolute h-40 w-40 rounded-full border-2 border-[var(--neon)]"
-        style={{ left: MID, top: cy, ...v(T_SLAM + 300) }}
+        className="shockwave absolute h-40 w-40 rounded-full border-2"
+        style={{ left: MID, top: cy, borderColor: c(accent), ...v(T_SLAM + 300) }}
       />
       {BURST.map((p, i) => (
         <span
@@ -163,8 +156,8 @@ function DominantReveal({ name }: { name: string | null }) {
               top: cy,
               width: p.size,
               height: p.size,
-              background: p.pink ? "var(--pink)" : "var(--neon)",
-              boxShadow: `0 0 10px ${p.pink ? "var(--pink)" : "var(--neon)"}`,
+              background: c(p.pink ? accent : main),
+              boxShadow: `0 0 10px ${c(p.pink ? accent : main)}`,
               "--dx": `${p.dx}px`,
               "--dy": `${p.dy}px`,
               ...v(T_SLAM + 100 + p.lag),
@@ -175,8 +168,13 @@ function DominantReveal({ name }: { name: string | null }) {
 
       <div className="absolute left-0 right-0 text-center" style={{ top: cy - 85 }}>
         <span
-          className="slam neon-text inline-block font-[family-name:var(--font-display)] text-[150px] uppercase leading-none tracking-[0.12em]"
-          style={{ ...v(T_SLAM), textShadow: "0 0 18px rgba(41,224,143,0.9), 0 0 60px rgba(41,224,143,0.5), 6px 0 0 rgba(255,79,216,0.55)" }}
+          className="slam title inline-block whitespace-nowrap leading-none"
+          style={{
+            ...v(T_SLAM),
+            fontSize: headline.length > 10 ? 104 : 132,
+            color: c(main),
+            textShadow: `0 0 18px ${c(main, 0.9)}, 0 0 60px ${c(main, 0.5)}, 6px 0 0 ${c(accent, 0.55)}`,
+          }}
         >
           {headline}
         </span>
@@ -226,5 +224,5 @@ function Decode({ text, startAfter, ms }: { text: string; startAfter: number; ms
     };
   }, [text, startAfter, ms]);
 
-  return <span className="digits">{out}</span>;
+  return <span className="font-[family-name:var(--font-display)] font-semibold">{out}</span>;
 }

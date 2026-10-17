@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 
-const COLORS = ["41,224,143", "41,224,143", "41,224,143", "255,79,216"];
+const COLORS = ["0,232,122", "0,232,122", "0,232,122", "255,29,120"];
 
 // Slow drifting green / pink particles with faint links between near neighbours.
 export default function ParticleField({ count = 90 }: { count?: number }) {

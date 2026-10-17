@@ -1,20 +1,44 @@
 @import "tailwindcss";
 
+/* TRSYP 3.0 brand, as the main site and the admin portal's venue screens set it:
+   near-black ground, the logo's green and pink, navy glass cards with 1px
+   hairlines, soft light rather than glare. Every match is a green corner
+   (team 1) against a pink one (team 2). */
 :root {
-  --bg: #020705;
-  --panel: #04110c;
-  --neon: #29e08f;
-  --neon-dim: #0f5c3b;
-  --neon-faint: rgba(41, 224, 143, 0.12);
-  --pink: #ff4fd8;
-  --pink-dim: rgba(255, 79, 216, 0.35);
-  --text: #e6fff3;
-  --text-dim: #7fb79c;
+  --bg: #010008;
+  --surface: linear-gradient(145deg, rgba(10, 15, 30, 0.86), rgba(5, 8, 18, 0.92));
+  --surface-solid: #070b17;
+  --line: rgba(255, 255, 255, 0.07);
+  --line-2: rgba(255, 255, 255, 0.13);
 
-  --cell-white: #f3f6f4;
+  --green: #00e87a;
+  --pink: #ff1d78;
+  --green-soft: rgba(0, 232, 122, 0.8);
+  --pink-soft: rgba(255, 29, 120, 0.8);
+  /* every branch logo, one colour: the RAS violet (#601269 in the logos), lifted to read on the dark stage */
+  --ras-violet: #b25fc4;
+
+  /* older names, still used across the screens */
+  --neon: var(--green);
+  --neon-dim: rgba(255, 255, 255, 0.18);
+  --neon-faint: rgba(0, 232, 122, 0.08);
+  --pink-dim: rgba(255, 29, 120, 0.4);
+
+  --text: #ffffff;
+  --text-dim: rgba(255, 255, 255, 0.58);
+  --text-faint: rgba(255, 255, 255, 0.36);
+
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* the physical field colours (grid squares, shape pieces) */
+  --cell-white: #f3f5f8;
   --cell-red: #f2556b;
   --cell-blue: #4d6bff;
-  --shape-grey: #6c7370;
+  /* a used piece: plainly grey on the dark board */
+  --shape-grey: #8b909c;
+
+  /* numbers in Host Grotesk: Orbitron's slashed-box zero reads as "Ø" at scoreboard size */
+  --font-digits: var(--font-body);
 }
 
 @theme inline {
@@ -42,22 +66,360 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+::selection {
+  background: rgba(0, 232, 122, 0.28);
+  color: #fff;
+}
+
+:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 3px;
+}
+
+@layer components {
 .neon-text {
-  color: var(--neon);
-  text-shadow: 0 0 8px rgba(41, 224, 143, 0.65), 0 0 24px rgba(41, 224, 143, 0.35);
+  color: var(--green);
+  text-shadow: 0 0 32px rgba(0, 232, 122, 0.35);
 }
 
 .pink-text {
   color: var(--pink);
-  text-shadow: 0 0 8px rgba(255, 79, 216, 0.6);
+  text-shadow: 0 0 32px rgba(255, 29, 120, 0.35);
 }
 
 .digits {
-  font-family: var(--font-digits), monospace;
+  font-family: var(--font-digits), sans-serif;
   font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
 }
 
-/* Comet of light travelling around a HUD frame */
+/* ─── Stage backdrop: the two corners' light and the arena floor ───── */
+.stage-light {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(50% 55% at 0% 0%, rgba(0, 232, 122, 0.07), transparent 70%),
+    radial-gradient(50% 55% at 100% 0%, rgba(255, 29, 120, 0.07), transparent 70%);
+}
+
+.stage-floor {
+  position: absolute;
+  right: -50%;
+  bottom: 0;
+  left: -50%;
+  height: 46%;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  background-size: 72px 72px;
+  transform: perspective(520px) rotateX(64deg);
+  transform-origin: 50% 100%;
+  /* fades out at the very bottom too, so it never ends in a hard edge */
+  mask-image: linear-gradient(to top, transparent 0%, #000 14%, transparent 75%);
+}
+
+@layer components {
+/* ─── Panel: the brand card ─────────────────────────────────────────── */
+.panel {
+  position: relative;
+  border-radius: var(--r, 18px);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.38);
+}
+
+/* The navbar's edge along the top: green into pink, one match, two corners.
+   A team's own panels carry only their corner's colour. */
+.panel::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  right: 28px;
+  left: 28px;
+  height: 1px;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(0, 232, 122, 0.4) 20%,
+    rgba(255, 255, 255, 0.12) 50%,
+    rgba(255, 29, 120, 0.4) 80%,
+    transparent
+  );
+}
+
+.panel[data-corner="0"]::before {
+  background: linear-gradient(90deg, transparent, rgba(0, 232, 122, 0.55) 30%, rgba(0, 232, 122, 0.55) 70%, transparent);
+}
+
+.panel[data-corner="1"]::before {
+  background: linear-gradient(90deg, transparent, rgba(255, 29, 120, 0.55) 30%, rgba(255, 29, 120, 0.55) 70%, transparent);
+}
+
+.panel[data-quiet]::before {
+  display: none;
+}
+
+/* Hover light for clickable cards, from the top, in the brand's two colours. */
+.panel-hover {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  background:
+    radial-gradient(90% 120% at 50% 0%, rgba(0, 232, 122, 0.1), transparent 70%);
+  transition: opacity 240ms ease;
+}
+
+.group:hover .panel-hover {
+  opacity: 1;
+}
+
+/* ─── Labels, pills, buttons ───────────────────────────────────────── */
+.label {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.title {
+  font-family: var(--font-display), sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.name {
+  font-family: var(--font-display), sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  line-height: 1.4;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--text-dim);
+}
+
+.pill--green {
+  color: var(--green);
+  background: rgba(0, 232, 122, 0.08);
+  border-color: rgba(0, 232, 122, 0.3);
+}
+
+.pill--pink {
+  color: var(--pink);
+  background: rgba(255, 29, 120, 0.08);
+  border-color: rgba(255, 29, 120, 0.32);
+}
+
+.pill--red {
+  color: var(--cell-red);
+  background: rgba(242, 85, 107, 0.1);
+  border-color: rgba(242, 85, 107, 0.4);
+}
+
+.pill-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* The two corners' colours meeting around a pill. */
+.btn-rim {
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background:
+    linear-gradient(var(--surface-solid), var(--surface-solid)) padding-box,
+    linear-gradient(90deg, rgba(0, 232, 122, 0.6), rgba(255, 29, 120, 0.6)) border-box;
+  box-shadow:
+    -10px 14px 36px -14px rgba(0, 232, 122, 0.35),
+    10px 14px 36px -14px rgba(255, 29, 120, 0.35);
+  transition:
+    transform 160ms var(--ease),
+    background 300ms ease;
+}
+
+.btn-rim:enabled:hover {
+  background:
+    linear-gradient(#0a1020, #0a1020) padding-box,
+    linear-gradient(90deg, rgba(0, 232, 122, 0.9), rgba(255, 29, 120, 0.9)) border-box;
+}
+
+.btn-rim:enabled:active {
+  transform: scale(0.97);
+}
+
+.btn-rim:disabled {
+  background:
+    linear-gradient(var(--surface-solid), var(--surface-solid)) padding-box,
+    linear-gradient(90deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.1)) border-box;
+  box-shadow: none;
+}
+
+/* "VS" between two corners: a dark disc on a green-to-pink rim. */
+.vs-disc {
+  display: grid;
+  place-items: center;
+  flex: none;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 1px solid transparent;
+  background:
+    linear-gradient(var(--surface-solid), var(--surface-solid)) padding-box,
+    linear-gradient(135deg, rgba(0, 232, 122, 0.6), rgba(255, 29, 120, 0.6)) border-box;
+  font-family: var(--font-display), sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* The logo's diamond, lit in a corner's colour. */
+.diamond {
+  display: inline-block;
+  flex: none;
+  width: 10px;
+  height: 10px;
+  rotate: 45deg;
+  background: var(--green);
+}
+
+.diamond--pink {
+  background: var(--pink);
+}
+
+kbd {
+  font-family: var(--font-body), sans-serif;
+}
+
+/* ─── Remote controller ─────────────────────────────────────────────── */
+.ctl-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  touch-action: manipulation;
+  transition:
+    transform 140ms var(--ease),
+    background-color 160ms ease,
+    border-color 160ms ease;
+}
+
+.ctl-btn:enabled:active {
+  transform: scale(0.96);
+  background: rgba(255, 255, 255, 0.09);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .ctl-btn:enabled:hover {
+    border-color: rgba(255, 255, 255, 0.22);
+    background: rgba(255, 255, 255, 0.07);
+  }
+}
+
+.ctl-btn:disabled {
+  opacity: 0.35;
+}
+
+.ctl-btn[data-on] {
+  border-color: rgba(0, 232, 122, 0.5);
+  background: rgba(0, 232, 122, 0.12);
+  color: var(--green);
+}
+
+.ctl-btn--green {
+  border-color: rgba(0, 232, 122, 0.4);
+  background: rgba(0, 232, 122, 0.1);
+  color: var(--green);
+}
+
+.ctl-btn--pink {
+  border-color: rgba(255, 29, 120, 0.4);
+  background: rgba(255, 29, 120, 0.1);
+  color: var(--pink);
+}
+
+.ctl-btn--danger {
+  border-color: rgba(242, 85, 107, 0.45);
+  color: var(--cell-red);
+}
+
+.ctl-input {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 18px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+  outline: none;
+}
+
+.ctl-input:focus {
+  border-color: rgba(0, 232, 122, 0.45);
+  box-shadow: 0 0 0 3px rgba(0, 232, 122, 0.1);
+}
+
+/* segmented switch */
+.ctl-seg {
+  display: inline-grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  padding: 3px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.ctl-seg > button {
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 9px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-dim);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ctl-seg > button[data-on] {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+}
+
+/* Comet of light travelling around a panel */
 @keyframes trace {
   to {
     stroke-dashoffset: 0;
@@ -107,7 +469,8 @@ body {
 }
 .reveal.on {
   opacity: 1;
-  clip-path: inset(0 0 0 0);
+  /* open past the box, so glows, shadows and scaled cards are never cropped */
+  clip-path: inset(-80px -80px -80px -80px);
   transform: none;
 }
 
@@ -117,7 +480,7 @@ body {
   20% { text-shadow: 4px 0 var(--pink), -4px 0 var(--neon); transform: translateX(3px); }
   40% { text-shadow: -2px 0 var(--pink), 2px 0 var(--neon); transform: translateX(-2px) skewX(4deg); }
   60% { text-shadow: 2px 0 var(--pink), -1px 0 var(--neon); transform: none; }
-  100% { text-shadow: 0 0 8px rgba(41, 224, 143, 0.65), 0 0 24px rgba(41, 224, 143, 0.35); transform: none; }
+  100% { text-shadow: 0 0 32px rgba(0, 232, 122, 0.35); transform: none; }
 }
 .glitch.on {
   animation: glitch 520ms steps(6, end) var(--delay, 0ms) both;
@@ -182,18 +545,462 @@ body {
 }
 
 @keyframes pulse-glow {
-  0%, 100% { text-shadow: 0 0 10px rgba(41, 224, 143, 0.7), 0 0 30px rgba(41, 224, 143, 0.4); }
-  50% { text-shadow: 0 0 22px rgba(41, 224, 143, 1), 0 0 70px rgba(41, 224, 143, 0.7), 0 0 120px rgba(255, 79, 216, 0.35); }
+  0%, 100% { text-shadow: 0 0 10px rgba(0, 232, 122, 0.7), 0 0 30px rgba(0, 232, 122, 0.4); }
+  50% { text-shadow: 0 0 22px rgba(0, 232, 122, 1), 0 0 70px rgba(0, 232, 122, 0.7), 0 0 120px rgba(255, 29, 120, 0.35); }
 }
 .pulse-glow {
   animation: pulse-glow 1.6s ease-in-out var(--delay, 0ms) infinite;
 }
+@keyframes pulse-glow-pink {
+  0%, 100% { text-shadow: 0 0 10px rgba(255, 29, 120, 0.7), 0 0 30px rgba(255, 29, 120, 0.4); }
+  50% { text-shadow: 0 0 22px rgba(255, 29, 120, 1), 0 0 70px rgba(255, 29, 120, 0.7), 0 0 120px rgba(0, 232, 122, 0.3); }
+}
+.pulse-glow--pink {
+  animation-name: pulse-glow-pink;
+}
 
 @media (prefers-reduced-motion: reduce) {
-  .slam, .shockwave, .shake, .burst, .expand-x, .pulse-glow {
+  .slam, .shockwave, .shake, .burst, .expand-x, .pulse-glow, .pulse-glow--pink {
     animation-duration: 1ms !important;
     animation-iteration-count: 1 !important;
   }
+}
+
+/* ─── Logo screen ───────────────────────────────────────────────────── */
+@keyframes logo-in {
+  from { opacity: 0; transform: scale(0.96); filter: blur(10px); }
+}
+.logo-in {
+  animation: logo-in 1200ms var(--ease) both;
+}
+@keyframes logo-aura {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.05); }
+}
+.logo-aura {
+  animation: logo-aura 6s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .logo-in, .logo-aura { animation: none; }
+}
+
+/* ─── Stage opener (01 Polygame / 02 Garden / 03 Mine) ─────────────────
+   Everything rests hidden; .stage-on plays it in, staggered. Taking .stage-on
+   away clears it quickly, with no stagger, so the next screen never waits. */
+.stage-num {
+  right: -60px;
+  bottom: -230px;
+  font-size: 1150px;
+  font-weight: 700;
+  color: transparent;
+  -webkit-text-stroke: 2px rgba(255, 255, 255, 0.07);
+  /* fades out downward, so it never ends in a hard cut at the screen's edge */
+  mask-image: linear-gradient(to bottom, #000 45%, transparent 82%);
+  opacity: 0;
+  transform: translateX(80px) scale(0.96);
+  transition: opacity 300ms ease, transform 500ms var(--ease);
+}
+.stage-on .stage-num {
+  opacity: 1;
+  transform: none;
+  transition: opacity 1400ms ease 100ms, transform 2400ms var(--ease) 100ms;
+}
+
+.stage-char {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(0.28em);
+  filter: blur(14px);
+  transition: opacity 220ms ease, transform 300ms var(--ease), filter 220ms ease;
+}
+.stage-on .stage-char {
+  opacity: 1;
+  transform: none;
+  filter: none;
+  transition: opacity 600ms ease, transform 800ms var(--ease), filter 600ms ease;
+  transition-delay: calc(var(--c) * 55ms + 250ms);
+}
+
+.stage-kicker,
+.stage-sub,
+.stage-rail {
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 220ms ease, transform 300ms var(--ease);
+}
+.stage-on .stage-kicker {
+  opacity: 1;
+  transform: none;
+  transition: opacity 600ms ease 150ms, transform 800ms var(--ease) 150ms;
+}
+.stage-on .stage-sub {
+  opacity: 1;
+  transform: none;
+  transition: opacity 700ms ease 1000ms, transform 900ms var(--ease) 1000ms;
+}
+.stage-on .stage-rail {
+  opacity: 1;
+  transform: none;
+  transition: opacity 700ms ease 300ms, transform 900ms var(--ease) 300ms;
+}
+
+/* green corner into pink corner, swept in under the title */
+.stage-line {
+  background: linear-gradient(90deg, var(--green), rgba(255, 255, 255, 0.5) 50%, var(--pink));
+  box-shadow: 0 0 24px rgba(0, 232, 122, 0.35);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 300ms var(--ease);
+}
+.stage-on .stage-line {
+  transform: scaleX(1);
+  transition: transform 1100ms var(--ease) 650ms;
+}
+
+.stage-rail li {
+  color: var(--text-faint);
+}
+.stage-rail-bar {
+  background: rgba(255, 255, 255, 0.1);
+}
+.stage-rail li[data-state="done"] {
+  color: var(--text-dim);
+}
+.stage-rail li[data-state="done"] .stage-rail-bar {
+  background: rgba(255, 255, 255, 0.35);
+}
+.stage-rail li[data-state="now"] {
+  color: #fff;
+}
+.stage-rail li[data-state="now"] .digits {
+  color: var(--green);
+}
+.stage-rail li[data-state="now"] .stage-rail-bar {
+  background: var(--green);
+  box-shadow: 0 0 16px rgba(0, 232, 122, 0.6);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stage-num, .stage-char, .stage-kicker, .stage-sub, .stage-rail, .stage-line {
+    transition-duration: 1ms !important;
+    transition-delay: 0ms !important;
+  }
+}
+
+/* ─── Pin penalty: pieces freezing over ───────────────────────────────
+   The PINNED badge slams first; then each frozen piece crystallises in turn
+   (--i), with a frost ring breaking off it. */
+.ice-sheet,
+.ice-ring,
+.ice-flake {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+@keyframes ice-in {
+  0% { opacity: 0; transform: scale(1.6); filter: blur(6px); }
+  60% { opacity: 1; transform: scale(0.94); filter: blur(0); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.ice-sheet {
+  animation: ice-in 620ms cubic-bezier(0.2, 0.8, 0.2, 1) calc(700ms + var(--i, 0) * 260ms) both;
+}
+@keyframes ice-ring {
+  0% { opacity: 0.95; transform: scale(1); }
+  100% { opacity: 0; transform: scale(2.4); }
+}
+.ice-ring {
+  opacity: 0;
+  animation: ice-ring 900ms cubic-bezier(0.1, 0.7, 0.3, 1) calc(1000ms + var(--i, 0) * 260ms) both;
+}
+@keyframes ice-flake {
+  from { opacity: 0; transform: rotate(-90deg) scale(0.2); }
+}
+.ice-flake {
+  animation: ice-flake 500ms var(--ease) calc(1100ms + var(--i, 0) * 260ms) both;
+}
+
+/* the frost sweeping across the pinned team's shapes panel */
+@keyframes frost-sweep {
+  0% { opacity: 0; transform: translateX(-60%); }
+  25% { opacity: 1; }
+  100% { opacity: 0; transform: translateX(60%); }
+}
+.frost-sweep {
+  background: linear-gradient(100deg, transparent 20%, rgba(214, 242, 255, 0.35) 45%, rgba(255, 255, 255, 0.55) 50%, rgba(214, 242, 255, 0.35) 55%, transparent 80%);
+  animation: frost-sweep 1300ms cubic-bezier(0.4, 0, 0.2, 1) 500ms both;
+}
+@keyframes frost-label {
+  0% { opacity: 0; transform: translate(-50%, 10px) scale(0.9); }
+  12%, 80% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -6px) scale(1); }
+}
+.frost-label {
+  animation: frost-label 3400ms var(--ease) 600ms both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ice-sheet, .ice-ring, .ice-flake, .frost-sweep, .frost-label {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+  }
+}
+
+/* ─── Live match: a score update landing ─────────────────────────────── */
+@keyframes score-bump {
+  0% { transform: scale(1.35); filter: brightness(1.8); }
+  100% { transform: none; filter: none; }
+}
+.score-bump {
+  display: inline-block;
+  animation: score-bump 700ms var(--ease) both;
+}
+@keyframes stats-toast {
+  0% { opacity: 0; transform: translate(-50%, -24px); }
+  10%, 82% { opacity: 1; transform: translate(-50%, 0); }
+  100% { opacity: 0; transform: translate(-50%, -12px); }
+}
+.stats-toast {
+  animation: stats-toast 3600ms var(--ease) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .score-bump { animation: none; }
+}
+
+/* ─── Polygame: frozen by the opponent's green triangle (TeamPanel) ──────
+   Frost sweeps the frozen team's boards and a cold veil stays on them; the
+   timer panel ices over with a countdown that drains. */
+.ice-veil {
+  background: linear-gradient(180deg, rgba(190, 235, 255, 0.11), rgba(190, 235, 255, 0.04));
+  box-shadow: inset 0 0 0 1px rgba(191, 233, 255, 0.45), inset 0 0 44px rgba(150, 215, 255, 0.2);
+  animation: ice-veil-in 500ms var(--ease) both;
+}
+@keyframes ice-veil-in {
+  from { opacity: 0; }
+}
+.ice-veil .frost-sweep { animation-delay: 0ms; }
+.ice-panel {
+  border-color: rgba(191, 233, 255, 0.55);
+  background: linear-gradient(180deg, rgba(150, 215, 255, 0.13), rgba(150, 215, 255, 0.03)), var(--surface);
+  box-shadow: 0 0 30px -8px rgba(150, 215, 255, 0.55), 0 12px 32px rgba(0, 0, 0, 0.38);
+}
+.ice-panel [role="timer"] {
+  color: #dff5ff;
+  text-shadow: 0 0 18px rgba(150, 215, 255, 0.65);
+}
+.ice-tag {
+  color: #dff5ff;
+  border: 1px solid rgba(191, 233, 255, 0.6);
+  background: rgba(6, 34, 58, 0.85);
+  box-shadow: 0 0 20px -6px rgba(150, 215, 255, 0.9);
+  animation: ice-tag-in 600ms var(--ease) both;
+}
+@keyframes ice-tag-in {
+  0% { opacity: 0; transform: scale(1.5); filter: blur(4px); }
+  60% { opacity: 1; transform: scale(0.95); filter: blur(0); }
+  100% { opacity: 1; transform: none; }
+}
+.ice-drain {
+  background: #bfe9ff;
+  box-shadow: 0 0 10px rgba(150, 215, 255, 0.9);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ice-veil, .ice-tag { animation: none; }
+}
+
+/* ─── Mine: glitch cards (TeamPanel MinePanel) ────────────────────────── */
+.glitch--pink { --gc: var(--pink); --gc-rgb: 255, 29, 120; }
+.glitch--green { --gc: var(--green); --gc-rgb: 0, 232, 122; }
+.glitch-tile {
+  border-color: rgba(var(--gc-rgb), 0.3);
+  background: radial-gradient(110% 75% at 50% 32%, rgba(var(--gc-rgb), 0.11), transparent 72%), rgba(255, 255, 255, 0.02);
+  transition: border-color 700ms var(--ease), background 700ms var(--ease);
+}
+.glitch-name { color: #fff; }
+.glitch-time { color: var(--gc); }
+.glitch-art { transition: filter 700ms var(--ease), opacity 700ms var(--ease); }
+/* live: the card glitches in, then glows while its time drains */
+.glitch-tile[data-state="live"] {
+  border-color: var(--gc);
+  background: radial-gradient(110% 80% at 50% 32%, rgba(var(--gc-rgb), 0.26), transparent 75%), rgba(var(--gc-rgb), 0.05);
+  animation: glitch-in 900ms steps(1) both, glitch-glow 1400ms ease-in-out 900ms infinite;
+}
+.glitch-tile[data-state="live"] .glitch-art { animation: glitch-split 900ms steps(1) both; }
+.glitch-drain {
+  background: var(--gc);
+  box-shadow: 0 0 14px var(--gc);
+}
+/* used: greyed for the rest of the match */
+.glitch-tile[data-state="used"] {
+  border-color: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.015);
+}
+.glitch-tile[data-state="used"] .glitch-art { filter: grayscale(1) brightness(0.6); opacity: 0.3; }
+.glitch-tile[data-state="used"] .glitch-name { color: var(--text-faint); }
+.glitch-tile[data-state="used"] .glitch-time { color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.16em; }
+@keyframes glitch-in {
+  0% { transform: scale(1.12); clip-path: inset(0 0 62% 0); filter: brightness(2.2); }
+  8% { transform: scale(1.1) translateX(-10px); clip-path: inset(30% 0 22% 0); filter: brightness(1.8) hue-rotate(60deg); }
+  16% { transform: scale(1.08) translateX(8px); clip-path: inset(0); filter: brightness(1.6); }
+  26% { transform: scale(1.06) translateX(-5px); clip-path: inset(56% 0 8% 0); }
+  36% { transform: scale(1.04) translateX(3px); clip-path: inset(0); filter: brightness(1.3); }
+  50% { transform: scale(1.02) translateX(-2px); }
+  64%, 100% { transform: none; clip-path: inset(0); filter: none; }
+}
+@keyframes glitch-split {
+  0% { transform: translateX(6px); filter: drop-shadow(-9px 0 0 rgba(255, 29, 120, 0.9)) drop-shadow(9px 0 0 rgba(0, 220, 255, 0.9)); }
+  20% { transform: translateX(-6px) skewX(-8deg); filter: drop-shadow(7px 0 0 rgba(255, 29, 120, 0.9)) drop-shadow(-7px 0 0 rgba(0, 220, 255, 0.9)); }
+  40% { transform: translateX(3px); filter: drop-shadow(-3px 0 0 rgba(255, 29, 120, 0.8)) drop-shadow(3px 0 0 rgba(0, 220, 255, 0.8)); }
+  60%, 100% { transform: none; filter: none; }
+}
+@keyframes glitch-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(var(--gc-rgb), 0); }
+  50% { box-shadow: 0 0 36px -2px rgba(var(--gc-rgb), 0.5); }
+}
+/* the opponent's card hitting this team: a tag over its timer, and the timer flickers */
+.glitch-hit-tag {
+  color: var(--gc);
+  border: 1px solid rgba(var(--gc-rgb), 0.6);
+  background: rgba(var(--gc-rgb), 0.1);
+  box-shadow: 0 0 26px -6px rgba(var(--gc-rgb), 0.8);
+  animation: glitch-in 700ms steps(1) both;
+}
+.glitch-hit [role="timer"] { animation: timer-jam 2.2s steps(1) infinite; }
+@keyframes timer-jam {
+  88% { transform: translateX(4px); text-shadow: -4px 0 rgba(255, 29, 120, 0.85), 4px 0 rgba(0, 220, 255, 0.85); }
+  92% { transform: translateX(-3px); text-shadow: 3px 0 rgba(255, 29, 120, 0.85), -3px 0 rgba(0, 220, 255, 0.85); }
+  96% { transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .glitch-tile[data-state="live"], .glitch-tile[data-state="live"] .glitch-art, .glitch-hit-tag, .glitch-hit [role="timer"] { animation: none; }
+}
+
+/* ─── Champion ceremony (timeline in ChampionScreen.tsx) ─────────────── */
+.champ {
+  background: #010008;
+}
+@keyframes champ-spot {
+  from { opacity: 0; transform: scaleY(0.6); transform-origin: top; }
+}
+.champ-spot {
+  animation: champ-spot 1400ms var(--ease) both;
+}
+@keyframes champ-rays-in {
+  from { opacity: 0; }
+}
+@keyframes champ-rays-turn {
+  to { rotate: 360deg; }
+}
+.champ-rays {
+  translate: -50% -50%;
+  background: repeating-conic-gradient(from 0deg, var(--main-soft) 0deg 4deg, transparent 4deg 18deg);
+  mask-image: radial-gradient(closest-side, #000 0%, rgba(0, 0, 0, 0.5) 35%, transparent 75%);
+  opacity: 0.55;
+  animation:
+    champ-rays-in 1600ms ease 300ms both,
+    champ-rays-turn 80s linear infinite;
+}
+.champ-draw {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: draw-on 900ms cubic-bezier(0.65, 0, 0.35, 1) calc(500ms + var(--i) * 120ms) forwards;
+}
+@keyframes draw-on {
+  to { stroke-dashoffset: 0; }
+}
+@keyframes champ-cup-fill {
+  from { opacity: 0; }
+}
+.champ-cup-fill {
+  animation: champ-cup-fill 700ms ease 1600ms both;
+}
+@keyframes champ-glint {
+  0% { opacity: 0; transform: translateX(-60%); }
+  30% { opacity: 1; }
+  100% { opacity: 0; transform: translateX(60%); }
+}
+.champ-glint {
+  transform-box: fill-box;
+  animation: champ-glint 1400ms ease-in-out 3000ms both, champ-glint 1400ms ease-in-out 7000ms both;
+}
+@keyframes champ-trophy {
+  0% { opacity: 0; transform: translate(-50%, 30px) scale(0.9); }
+  100% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+@keyframes champ-trophy-glow {
+  0%, 100% { filter: drop-shadow(0 0 18px var(--main-soft)); }
+  50% { filter: drop-shadow(0 0 46px var(--main)); }
+}
+.champ-trophy {
+  animation:
+    champ-trophy 900ms var(--ease) var(--delay) both,
+    champ-trophy-glow 2.6s ease-in-out 2200ms infinite;
+}
+.champ-char {
+  opacity: 0;
+  animation: champ-char 700ms var(--ease) calc(1900ms + var(--c) * 70ms) forwards;
+}
+@keyframes champ-char {
+  from { opacity: 0; transform: translateY(0.4em) scale(1.3); filter: blur(10px); }
+  to { opacity: 1; transform: none; filter: none; }
+}
+@keyframes champ-flash {
+  0% { opacity: 0; }
+  12% { opacity: 0.55; }
+  100% { opacity: 0; }
+}
+.champ-flash {
+  pointer-events: none;
+  opacity: 0;
+  animation: champ-flash 700ms ease-out var(--delay) both;
+}
+@keyframes champ-name-breathe {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.25); }
+}
+.champ-name {
+  animation:
+    slam 620ms cubic-bezier(0.2, 0.8, 0.2, 1) var(--delay) both,
+    champ-name-breathe 3s ease-in-out 4000ms infinite;
+}
+@keyframes champ-rise {
+  from { opacity: 0; transform: translateY(24px); }
+}
+.champ-rise {
+  animation: champ-rise 900ms var(--ease) var(--delay) both;
+}
+@keyframes champ-at {
+  from { visibility: hidden; }
+  to { visibility: visible; }
+}
+.champ-at {
+  animation: champ-at 1ms steps(1, end) var(--delay) both;
+}
+.champ-fade {
+  animation: champ-rays-in 900ms ease var(--delay) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .champ *, .champ-spot, .champ-rays {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+  }
+  .champ-draw { stroke-dashoffset: 0; }
+}
+
+/* ─── Homologation bars ─────────────────────────────────────────────── */
+.homol-bar {
+  background: linear-gradient(90deg, var(--green), rgba(255, 255, 255, 0.85) 60%, var(--pink));
+  box-shadow: 0 0 14px rgba(0, 232, 122, 0.45);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 300ms var(--ease);
+}
+.homol-bar-on {
+  transform: scaleX(1);
+  transition: transform 1100ms var(--ease) var(--delay, 0ms);
+}
+@media (prefers-reduced-motion: reduce) {
+  .homol-bar, .homol-bar-on { transition-duration: 1ms; transition-delay: 0ms; }
 }
 
 /* ─── League: the next match to play breathes ──────────────────────── */
