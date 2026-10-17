@@ -153,12 +153,12 @@ export const cupId = (r: CupRound) => `cup-${r}`;
 /* The competition's teams, in the admin portal's order (ids t1…t8, kept even
    for teams that are out, so ids and logos never shift). */
 const TEAMS: { name: string; branch: string; logo: string; out?: true }[] = [
-  { name: "IEEE RAS ENSIT", branch: "ENSIT SB", logo: "ensit" },
+  { name: "WAHCHY", branch: "ENSIT SB", logo: "ensit" }, // was IEEE RAS ENSIT
   { name: "HANNIBAL", branch: "ENICarthage SB", logo: "enicarthage" },
   { name: "AUTOBOTS", branch: "ESPRIT SB", logo: "esprit", out: true }, // disqualified
   { name: "LONE WOLVES", branch: "IIT SB", logo: "iit" },
-  { name: "SYNAPTECH", branch: "ISTMT SB", logo: "istmt" },
-  { name: "HEPTABOT", branch: "ENETCom SB", logo: "enetcom", out: true }, // disqualified
+  { name: "SYNAPTECH", branch: "ISTMT SB", logo: "istmt", out: true }, // out
+  { name: "HEPTABOT", branch: "ENETCom SB", logo: "enetcom" },
   { name: "SPARK", branch: "ENIG SB", logo: "enig" },
   { name: "NEXORA", branch: "ENIG SB", logo: "enig" },
 ];
@@ -171,13 +171,13 @@ export const teamBranch = (leagueId: string | undefined) => {
   return t ? { branch: t.branch, logo: `/branches/${t.logo}.png` } : null;
 };
 
-/* The league draw made on the admin portal's /draw (saved 15 Oct 2026):
-   each pair is [green corner, pink corner] = [team 1, team 2]. AUTOBOTS and
-   HEPTABOT were disqualified, so their opponents (HANNIBAL, NEXORA) meet. */
+/* The league draw, from the admin portal's /draw (saved 15 Oct 2026) as
+   changed after AUTOBOTS and SYNAPTECH went out: each pair is
+   [green corner, pink corner] = [team 1, team 2]. */
 const DRAW: [string, string][] = [
-  ["t4", "t1"], // LONE WOLVES vs IEEE RAS ENSIT
-  ["t2", "t8"], // HANNIBAL vs NEXORA
-  ["t5", "t7"], // SYNAPTECH vs SPARK
+  ["t4", "t1"], // LONE WOLVES vs WAHCHY
+  ["t2", "t7"], // HANNIBAL vs SPARK
+  ["t8", "t6"], // NEXORA vs HEPTABOT
 ];
 export const LEAGUE_SLOTS = DRAW.length;
 export type MatchStatus = "upcoming" | "live" | "done";
@@ -306,6 +306,7 @@ const shear = (pts: [number, number][]): [number, number][] =>
 export const BOARD_W = COL_W * 5 + (TRI_H * 2 + CUBE_H) * SHEAR;
 export const BOARD_H = TRI_H * 2 + CUBE_H;
 
+const RENUMBER: Record<number, number> = { 8: 11, 11: 8, 20: 23, 23: 20 };
 export const SHAPES: ShapeDef[] = Array.from({ length: 5 }, (_, c) => {
   const x = c * COL_W;
   const r = x + COL_W;
@@ -324,7 +325,10 @@ export const SHAPES: ShapeDef[] = Array.from({ length: 5 }, (_, c) => {
     { id: `rb${n}`, num: b + 6, kind: "red-tri", label: `Red bottom triangle ${n}`, points: shear([[x, y2], [m, y2], [x, y3]]) },
     { id: `g${n}`, num: null, kind: "green", label: `Green triangle ${n}`, points: shear([[x, 0], [r, 0], [m, y1]]) },
   ] satisfies ShapeDef[];
-}).flat();
+})
+  .flat()
+  // the real board's numbers: the cubes of columns 2 and 4 swap theirs (8 ↔ 11, 20 ↔ 23)
+  .map((s) => (s.num !== null && RENUMBER[s.num] ? { ...s, num: RENUMBER[s.num] } : s));
 
 /* ─── State ─────────────────────────────────────────────────────────── */
 

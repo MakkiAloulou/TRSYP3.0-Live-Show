@@ -810,6 +810,12 @@ kbd {
 /* ─── Mine: glitch cards (TeamPanel MinePanel) ────────────────────────── */
 .glitch--pink { --gc: var(--pink); --gc-rgb: 255, 29, 120; }
 .glitch--green { --gc: var(--green); --gc-rgb: 0, 232, 122; }
+.glitch--tri { --gc: #5fc46b; --gc-rgb: 95, 196, 107; }
+/* armed: its countdown is on screen */
+.glitch-tile[data-state="arming"] {
+  border-color: var(--gc);
+  animation: glitch-glow 700ms ease-in-out infinite;
+}
 .glitch-tile {
   border-color: rgba(var(--gc-rgb), 0.3);
   background: radial-gradient(110% 75% at 50% 32%, rgba(var(--gc-rgb), 0.11), transparent 72%), rgba(255, 255, 255, 0.02);
@@ -870,6 +876,34 @@ kbd {
   92% { transform: translateX(-3px); text-shadow: 3px 0 rgba(255, 29, 120, 0.85), -3px 0 rgba(0, 220, 255, 0.85); }
   96% { transform: none; }
 }
+/* ─── The countdown before a card / green triangle takes effect (EffectCountdown) */
+.cd { animation: cd-in 320ms var(--ease) both; }
+@keyframes cd-in {
+  from { opacity: 0; transform: scale(0.97); }
+}
+.cd-scrim {
+  background: radial-gradient(70% 120% at 50% 50%, rgba(var(--gc-rgb), 0.16), transparent 70%), rgba(1, 0, 8, 0.97);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(var(--gc-rgb), 0.55);
+  box-shadow: 0 0 70px -12px rgba(var(--gc-rgb), 0.7);
+}
+.cd-title { color: var(--gc); text-shadow: 0 0 40px rgba(var(--gc-rgb), 0.55); }
+.cd-art { animation: glitch-split 900ms steps(1) both; filter: drop-shadow(0 0 30px rgba(var(--gc-rgb), 0.45)); }
+.cd-ring { stroke: var(--gc); filter: drop-shadow(0 0 10px rgba(var(--gc-rgb), 0.8)); }
+.cd-digit {
+  text-shadow: 0 0 60px rgba(var(--gc-rgb), 0.85);
+  animation: cd-tick 1000ms var(--ease) both;
+}
+@keyframes cd-tick {
+  0% { opacity: 0; transform: scale(1.7); filter: blur(10px); }
+  22% { opacity: 1; transform: scale(1); filter: blur(0); }
+  80% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0.3; transform: scale(0.88); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cd, .cd-art, .cd-digit { animation: none; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .glitch-tile[data-state="live"], .glitch-tile[data-state="live"] .glitch-art, .glitch-hit-tag, .glitch-hit [role="timer"] { animation: none; }
 }

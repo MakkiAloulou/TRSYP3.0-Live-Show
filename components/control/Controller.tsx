@@ -1156,7 +1156,7 @@ function Boards({ state, act }: { state: GameState; act: Act }) {
               <div>
                 <div className="name text-[16px] text-white">Freeze {state.teams[team ? 0 : 1].name}</div>
                 <div className="text-[14px] text-[var(--text-dim)]">
-                  Their robot is frozen for {GREEN_FREEZE_SECS} s. The triangle is used for the rest of the match.
+                  A 5 s countdown runs on the screen, then their robot is frozen for {GREEN_FREEZE_SECS} s. The triangle is used for the rest of the match.
                 </div>
               </div>
             )}

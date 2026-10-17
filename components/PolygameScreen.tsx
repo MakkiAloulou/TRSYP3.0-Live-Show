@@ -13,6 +13,7 @@ import FinalScreen from "./FinalScreen";
 import LeaderboardScreen from "./LeaderboardScreen";
 import BracketScreen from "./BracketScreen";
 import ChampionScreen, { type Crown } from "./ChampionScreen";
+import EffectCountdown from "./EffectCountdown";
 import HomologationScreen from "./HomologationScreen";
 import LogoScreen from "./LogoScreen";
 import StageScreen from "./StageScreen";
@@ -897,6 +898,8 @@ export default function PolygameScreen() {
             />
           </div>
         </div>
+        {/* a card or green triangle about to take effect: its countdown, big */}
+        <EffectCountdown state={state} />
         </div>
 
         {/* Screen 0: match list (opaque, on top while open) */}

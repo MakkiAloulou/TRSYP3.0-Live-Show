@@ -5,6 +5,7 @@ import Image from "next/image";
 import { elapsedMs, formatTime, GLITCH_CARDS, GREEN_FREEZE_SECS, type Action, type GameKind, type TeamId, type TeamState, type TimerState } from "@/lib/game";
 import { phaseScore, scoreFor } from "@/lib/scoring";
 import ColorGrid from "./ColorGrid";
+import { phaseOf, useEffectClock, type Phase } from "./effectClock";
 import Panel from "./Panel";
 import ShapesBoard from "./ShapesBoard";
 
@@ -42,9 +43,17 @@ export default function TeamPanel({ id, team, opponent, dispatch, active, varian
   const st = team.stats;
   // Polygame: the opponent's green triangle freezing this team (the latest, if two overlap)
   const greens = Object.values(opponent?.greens ?? {});
-  const now = useEffectClock(greens.map((at) => [at, GREEN_FREEZE_SECS]));
-  const iceAt = variant === "polygame" && greens.length ? Math.max(...greens) : undefined;
-  const iceLeft = timeLeft(iceAt, GREEN_FREEZE_SECS, now);
+  const now = useEffectClock(greens.map((at) => [at, GREEN_FREEZE_SECS] as const));
+  // in effect once its countdown is over (the countdown itself shows across the screen)
+  const ice =
+    variant === "polygame"
+      ? greens
+          .map((at) => ({ at, p: phaseOf(at, GREEN_FREEZE_SECS, now) }))
+          .filter((x) => x.p.kind === "live")
+          .sort((a, b) => b.at - a.at)[0]
+      : undefined;
+  const iceAt = ice?.at;
+  const iceLeft = ice?.p.kind === "live" ? ice.p.left : null;
   const phasesScored = [0, 1, 2]
     .filter((i) => st[`pos${i + 1}` as "pos1"] || st[`acc${i + 1}` as "acc1"] || st[`time${i + 1}` as "time1"])
     .map((i) => ({ i, pts: phaseScore(team, i) }));
@@ -207,46 +216,20 @@ function PinIcon() {
   );
 }
 
-/** An effect still running: its time left (ms), else null. One started a
-    moment ago can be ahead of a `now` that isn't ticking yet: it counts as live. */
-const timeLeft = (at: number | undefined, secs: number, now: number) => {
-  if (at === undefined) return null;
-  const left = secs * 1000 - (now - at);
-  return left > 0 ? Math.min(left, secs * 1000) : null;
-};
-
-/** The clock for timed effects ([started at, seconds] each): ticks every frame while one
-    is running (a fresh one counts as running at once, see timeLeft), else holds still. */
-function useEffectClock(effects: readonly (readonly [number | undefined, number])[]) {
-  const [now, setNow] = useState(() => Date.now());
-  const ticking = effects.some(([at, secs]) => timeLeft(at, secs, now) !== null);
-  useEffect(() => {
-    if (!ticking) return;
-    let raf = 0;
-    const tick = () => {
-      setNow(Date.now());
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [ticking]);
-  return now;
-}
-
 /** Mine: the team's three glitch cards above its timer. No score: it's shown after the match.
     A card the opponent plays shows above this team's timer while it lasts. */
 function MinePanel({ id, team, opponent }: { id: TeamId; team: TeamState; opponent?: TeamState }) {
   const now = useEffectClock([team, opponent].flatMap((t) => GLITCH_CARDS.map((c) => [t?.cards?.[c.id], c.secs] as const)));
   // the opponent's card hitting this team (the latest, if two overlap)
-  const hit = GLITCH_CARDS.map((c) => ({ c, at: opponent?.cards?.[c.id], left: timeLeft(opponent?.cards?.[c.id], c.secs, now) }))
-    .filter((h) => h.left !== null)
+  const hit = GLITCH_CARDS.map((c) => ({ c, at: opponent?.cards?.[c.id], p: phaseOf(opponent?.cards?.[c.id], c.secs, now) }))
+    .flatMap((h) => (h.p.kind === "live" ? [{ ...h, left: h.p.left }] : []))
     .sort((a, b) => b.at! - a.at!)[0];
   return (
     <Panel className="h-[414px] w-full shrink-0" corner={id}>
       <div className="flex h-full flex-col px-6 pb-5 pt-5">
         <div className="grid min-h-0 flex-1 grid-cols-3 gap-4">
           {GLITCH_CARDS.map((c) => (
-            <GlitchTile key={c.id} card={c} at={team.cards?.[c.id]} left={timeLeft(team.cards?.[c.id], c.secs, now)} />
+            <GlitchTile key={c.id} card={c} at={team.cards?.[c.id]} phase={phaseOf(team.cards?.[c.id], c.secs, now)} />
           ))}
         </div>
         <div className={`mt-4 flex shrink-0 flex-col items-center gap-2 ${hit ? `glitch-hit glitch--${hit.c.color}` : ""}`}>
@@ -255,7 +238,7 @@ function MinePanel({ id, team, opponent }: { id: TeamId; team: TeamState; oppone
             {hit ? (
               <span key={hit.at} className="glitch-hit-tag title flex items-center gap-3 rounded-full px-5 py-1.5 text-[16px] leading-none">
                 {hit.c.name}
-                <span className="digits text-[18px] font-bold normal-case">{(hit.left! / 1000).toFixed(1)}s</span>
+                <span className="digits text-[18px] font-bold normal-case">{(hit.left / 1000).toFixed(1)}s</span>
               </span>
             ) : (
               <Label>Timer</Label>
@@ -268,9 +251,11 @@ function MinePanel({ id, team, opponent }: { id: TeamId; team: TeamState; oppone
   );
 }
 
-/** One glitch card: ready (full colour), live (glitches in, then drains), used (greyed). */
-function GlitchTile({ card, at, left }: { card: (typeof GLITCH_CARDS)[number]; at?: number; left: number | null }) {
-  const state = at === undefined ? "ready" : left !== null ? "live" : "used";
+/** One glitch card: ready (full colour), arming (its countdown is on screen), live (glitches
+    in, then drains), used (greyed). */
+function GlitchTile({ card, at, phase }: { card: (typeof GLITCH_CARDS)[number]; at?: number; phase: Phase }) {
+  const state = phase.kind;
+  const left = phase.kind === "live" || phase.kind === "arming" ? phase.left : 0;
   return (
     <div
       key={at ?? "ready"}
@@ -282,10 +267,10 @@ function GlitchTile({ card, at, left }: { card: (typeof GLITCH_CARDS)[number]; a
       </div>
       <span className="glitch-name title mt-1 whitespace-nowrap text-[17px] leading-none">{card.name}</span>
       <span className="glitch-time digits mt-2 text-[15px] font-semibold leading-none">
-        {state === "live" ? `${(left! / 1000).toFixed(1)}s` : state === "used" ? "Used" : `${card.secs}s`}
+        {state === "live" ? `${(left / 1000).toFixed(1)}s` : state === "arming" ? `in ${Math.ceil(left / 1000)}` : state === "used" ? "Used" : `${card.secs}s`}
       </span>
       {state === "live" && (
-        <span className="glitch-drain absolute bottom-0 left-0 h-[4px]" style={{ width: `${(left! / (card.secs * 1000)) * 100}%` }} />
+        <span className="glitch-drain absolute bottom-0 left-0 h-[4px]" style={{ width: `${(left / (card.secs * 1000)) * 100}%` }} />
       )}
     </div>
   );
