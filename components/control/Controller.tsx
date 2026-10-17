@@ -42,6 +42,8 @@ import {
 import { readKey, saveKey, useLink, type Command, type Snapshot, type View } from "@/lib/remote";
 import { nextCupMatch, nextStep, STAGES, stageTitle } from "@/lib/flow";
 import ColorGrid, { DIAG_LINE, HALVES } from "../ColorGrid";
+import { TargetContour, TargetGrid } from "../TargetShape";
+import { currentTarget } from "@/lib/shapes";
 import Branch from "../Branch";
 import FitText from "../FitText";
 import ShapesBoard from "../ShapesBoard";
@@ -103,6 +105,7 @@ const VIEW_LABEL: Record<View, string> = {
   matches: "Line-up",
   bracket: "Champions Cup",
   champion: "Champion",
+  shape: "Required shape",
   game: "Live match",
   stats: "Stats",
   final: "Game Stats",
@@ -179,7 +182,7 @@ export default function Controller() {
   };
   const view = snap?.screen.view;
   const overlay = !!snap?.screen.overlay;
-  const inMatch = view === "game" || view === "stats" || view === "final" || view === "board";
+  const inMatch = view === "shape" || view === "game" || view === "stats" || view === "final" || view === "board";
   const step = snap ? nextStep(snap.state, snap.screen.view, snap.screen.homol ?? 0) : null;
 
   const dk = snap ? draftKey(snap.state) : null;
@@ -344,6 +347,13 @@ function Panel({
       );
     case "bracket":
       return <BracketPanel state={state} cmd={cmd} act={act} />;
+    case "shape":
+      return (
+        <>
+          <ShapeCard state={state} />
+          <GamePanel state={state} offset={offset} act={act} />
+        </>
+      );
     case "game":
       return (
         <>
@@ -726,6 +736,22 @@ function BracketPanel({ state, cmd, act }: { state: GameState; cmd: Send; act: A
 
 /* ─── the live match ────────────────────────────────────────────────── */
 
+/** On screen before the match starts: the shape both teams must build. */
+function ShapeCard({ state }: { state: GameState }) {
+  const target = currentTarget(state);
+  if (!target) return null;
+  return (
+    <Section title={`Required shape · ${target.letter}`}>
+      <div className="flex items-center gap-5">
+        <TargetGrid target={target} size={132} gap={5} on />
+        <p className="text-[15px] leading-snug text-[var(--text-dim)]">
+          {target.pieces.cubes} cubes · {target.pieces.triangles} triangles. Next starts the match; its outline stays on both grids.
+        </p>
+      </div>
+    </Section>
+  );
+}
+
 function GamePanel({ state, offset, act }: { state: GameState; offset: number; act: Act }) {
   const game = state.game;
   const m = state.current ? state.matches.find((x) => x.id === state.current) : undefined;
@@ -1029,6 +1055,7 @@ function Boards({ state, act }: { state: GameState; act: Act }) {
   const [green, setGreen] = useState<string | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   const t = state.teams[team];
+  const target = currentTarget(state);
 
   const cellAt = (x: number, y: number) => {
     const el = document.elementFromPoint(x, y)?.closest<HTMLElement>("[data-cell]");
@@ -1107,7 +1134,7 @@ function Boards({ state, act }: { state: GameState; act: Act }) {
       <div className="w-full select-none [-webkit-touch-callout:none] [touch-action:none]">
         <ShapesBoard mirror={team === 1} shapes={t.shapes} onChange={() => {}} onPieceDown={pieceDown} />
       </div>
-      <div ref={gridRef} className="mx-auto mt-4 aspect-square w-full max-w-[360px]">
+      <div ref={gridRef} className="relative mx-auto mt-4 aspect-square w-full max-w-[360px]">
         <ColorGrid
           grid={t.grid}
           active={false}
@@ -1119,6 +1146,7 @@ function Boards({ state, act }: { state: GameState; act: Act }) {
           onHalf={() => {}}
           onKey={() => {}}
         />
+        {target && <TargetContour target={target} />}
       </div>
 
       {/* the piece under the finger, lifted above it so it stays visible */}

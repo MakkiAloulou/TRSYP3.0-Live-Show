@@ -6,6 +6,8 @@ import { elapsedMs, formatTime, GLITCH_CARDS, GREEN_FREEZE_SECS, type Action, ty
 import { phaseScore, scoreFor } from "@/lib/scoring";
 import ColorGrid from "./ColorGrid";
 import { phaseOf, useEffectClock, type Phase } from "./effectClock";
+import { TargetContour } from "./TargetShape";
+import type { Target } from "@/lib/shapes";
 import Panel from "./Panel";
 import ShapesBoard from "./ShapesBoard";
 
@@ -14,6 +16,8 @@ interface Props {
   team: TeamState;
   /** the other team (Mine: its glitch cards hit this one) */
   opponent?: TeamState;
+  /** Polygame: the shape the match asks for, outlined on the grid */
+  target?: Target | null;
   dispatch: (a: Action) => void;
   /** false while another screen is showing, so typing can't edit this grid */
   active: boolean;
@@ -23,7 +27,7 @@ interface Props {
   carried?: number;
 }
 
-export default function TeamPanel({ id, team, opponent, dispatch, active, variant = "polygame" }: Props) {
+export default function TeamPanel({ id, team, opponent, target, dispatch, active, variant = "polygame" }: Props) {
   const [editing, setEditing] = useState(false);
   const frozen = Object.entries(team.shapes).filter(([, v]) => v === "frozen").map(([k]) => k).sort();
   const game: GameKind = variant === "mine" ? "game3" : variant;
@@ -145,13 +149,17 @@ export default function TeamPanel({ id, team, opponent, dispatch, active, varian
           <div className="flex h-full flex-col items-center px-4 pb-4 pt-3.5">
             <Label>Grid</Label>
             <div className="min-h-0 flex-1 pt-2">
-              <ColorGrid
-                grid={team.grid}
-                active={active}
-                onCell={(i, half) => dispatch({ type: "cycleCell", team: id, index: i, half })}
-                onHalf={(i, half) => dispatch({ type: "cycleHalf", team: id, index: i, half })}
-                onKey={(i, half, key) => dispatch({ type: "editLabel", team: id, index: i, half, key })}
-              />
+              {/* the grid, with the required shape's outline over it */}
+              <div className="relative aspect-square h-full">
+                <ColorGrid
+                  grid={team.grid}
+                  active={active}
+                  onCell={(i, half) => dispatch({ type: "cycleCell", team: id, index: i, half })}
+                  onHalf={(i, half) => dispatch({ type: "cycleHalf", team: id, index: i, half })}
+                  onKey={(i, half, key) => dispatch({ type: "editLabel", team: id, index: i, half, key })}
+                />
+                {target && <TargetContour target={target} />}
+              </div>
             </div>
           </div>
         </Panel>

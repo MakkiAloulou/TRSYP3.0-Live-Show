@@ -14,7 +14,7 @@ import { createClient, type RealtimeChannel, type SupabaseClient } from "@supaba
 import type { Action, GameKind, GameState } from "./game";
 
 /** What the big screen is showing */
-export type View = "logo" | "homologation" | "intro" | "matches" | "bracket" | "champion" | "game" | "stats" | "final" | "board";
+export type View = "logo" | "homologation" | "intro" | "matches" | "bracket" | "champion" | "shape" | "game" | "stats" | "final" | "board";
 
 export interface Screen {
   view: View;

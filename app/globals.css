@@ -876,6 +876,69 @@ kbd {
   92% { transform: translateX(-3px); text-shadow: 3px 0 rgba(255, 29, 120, 0.85), -3px 0 rgba(0, 220, 255, 0.85); }
   96% { transform: none; }
 }
+/* ─── Polygame: the required shape (ShapeReveal, TargetShape) ──────────── */
+.target-cell {
+  fill: rgba(255, 255, 255, 0.04);
+  stroke: rgba(255, 255, 255, 0.16);
+  stroke-width: 1.5;
+  stroke-dasharray: 7 6;
+  opacity: 0;
+  transition: opacity 420ms var(--ease) calc(var(--i) * 16ms);
+}
+.target-on .target-cell { opacity: 1; }
+.target-part {
+  fill: rgba(0, 232, 122, 0.3);
+  stroke: rgba(0, 232, 122, 0.85);
+  stroke-width: 2;
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scale(0.55);
+  transition: opacity 420ms var(--ease) calc(650ms + var(--i) * 150ms), transform 520ms var(--ease) calc(650ms + var(--i) * 150ms);
+}
+.target-on .target-part { opacity: 1; transform: none; }
+.target-outline {
+  stroke: var(--green);
+  filter: drop-shadow(0 0 14px rgba(0, 232, 122, 0.85));
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  transition: stroke-dashoffset 1100ms var(--ease) 1450ms;
+}
+.target-on .target-outline { stroke-dashoffset: 0; }
+/* clearing away: everything at once, quickly */
+.target-grid:not(.target-on) * { transition-delay: 0ms; transition-duration: 280ms; }
+/* the outline on the teams' playing grids */
+.target-contour path {
+  stroke: var(--green);
+  filter: drop-shadow(0 0 6px rgba(0, 232, 122, 0.95));
+  animation: contour-in 900ms var(--ease) both;
+}
+@keyframes contour-in {
+  from { opacity: 0; }
+}
+.sr-in {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 500ms var(--ease) var(--d, 0ms), transform 650ms var(--ease) var(--d, 0ms);
+}
+.sr-on .sr-in { opacity: 1; transform: none; }
+.sr-letter {
+  color: #fff;
+  text-shadow: 0 0 90px rgba(0, 232, 122, 0.55);
+  opacity: 0;
+  transform: scale(1.4);
+  filter: blur(14px);
+  transition: opacity 600ms var(--ease) 1000ms, transform 850ms var(--ease) 1000ms, filter 600ms var(--ease) 1000ms;
+}
+.sr-on .sr-letter { opacity: 1; transform: none; filter: none; }
+.sr:not(.sr-on) .sr-in,
+.sr:not(.sr-on) .sr-letter { transition-delay: 0ms; transition-duration: 280ms; }
+.sr-piece { fill: rgba(0, 232, 122, 0.3); stroke: var(--green); stroke-width: 0.8; }
+@media (prefers-reduced-motion: reduce) {
+  .target-cell, .target-part, .target-outline, .sr-in, .sr-letter { transition: none; }
+  .target-contour path { animation: none; }
+}
+
 /* ─── The countdown before a card / green triangle takes effect (EffectCountdown) */
 .cd { animation: cd-in 320ms var(--ease) both; }
 @keyframes cd-in {

@@ -77,6 +77,8 @@ export function nextStep(s: GameState, view: View, homol: 0 | 1 | 2 = 0): Step {
     }
     case "champion":
       return { kind: "logo", label: "Back to the logo" };
+    case "shape":
+      return { kind: "screen", label: "Start the match" };
     default:
       return { kind: "screen", label: MATCH_NEXT[view](s) };
   }

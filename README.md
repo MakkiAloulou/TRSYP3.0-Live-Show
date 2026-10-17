@@ -28,6 +28,8 @@ The order is fixed. On the remote, **Next** always does the next thing and says 
 3. **01 · Polygame**: title card → line-up of the 3 league matches.
    - The pairs: LONE WOLVES v WAHCHY, HANNIBAL v SPARK, NEXORA v HEPTABOT. AUTOBOTS and SYNAPTECH are out.
    - Each match is played with its 3 phases in one go: live screen → Phase Stats → Game Stats → leaderboard → back to the line-up.
+   - Each Polygame match opens on its **required shape**, big: a 5×5 grid with the shape lit up, its letter, and what it's built from. Next starts the match, and the shape's outline stays on both teams' grids (and the remote's).
+   - The shapes: match 1 **T** (3 cubes · 4 triangles), match 2 **R**, match 3 **S**, 3rd place **Y**, final **P** (3 cubes · 2 triangles each). They live in `lib/shapes.ts`.
 4. **02 · Garden**: same pairs, same flow. Its Game Stats details screen shows time, position and the final score.
 5. **03 · Champions Cup**: the league's top 4, always **1st v 4th** and **2nd v 3rd**.
    - The pairs follow the table until the first cup match is opened.

@@ -3,6 +3,7 @@
 import { useEffect, useReducer, useRef, useState } from "react";
 import { canOpen, CUP_LABEL, cupGame, cupMatch, cupSlot, cupWinner, GAME_INFO, gameScore, initialState, reducer, slotCarry, type Action, type GameKind, type GameState } from "@/lib/game";
 import { nextStep, stageMode } from "@/lib/flow";
+import { currentTarget, targetFor } from "@/lib/shapes";
 import { compact, readKey, saveKey, screenBus, useLink, type Command, type Screen, type View } from "@/lib/remote";
 import Image from "next/image";
 import logo from "@/public/trsyp-logo.png";
@@ -18,6 +19,7 @@ import HomologationScreen from "./HomologationScreen";
 import LogoScreen from "./LogoScreen";
 import StageScreen from "./StageScreen";
 import MatchesScreen from "./MatchesScreen";
+import ShapeReveal from "./ShapeReveal";
 import StatsScreen from "./StatsScreen";
 import TeamPanel from "./TeamPanel";
 
@@ -162,6 +164,16 @@ export default function PolygameScreen() {
   const [listOpen, setListOpen] = useState(true);
   const [listOn, setListOn] = useState(false);
   const listOpenRef = useRef(true);
+  // a Polygame match opens on its required shape, big, before the live screen
+  const [shapeOpen, setShapeOpen] = useState(false);
+  const [shapeOn, setShapeOn] = useState(false);
+  const shapeOpenRef = useRef(false);
+  const shapeRef = useRef<HTMLDivElement>(null);
+  const closeShapeNow = () => {
+    shapeOpenRef.current = false;
+    setShapeOpen(false);
+    setShapeOn(false);
+  };
   // homologation, before any game: its opener (0), the scores (1), the leaderboard (2)
   const [homolOpen, setHomolOpen] = useState(false);
   const homolOpenRef = useRef(false);
@@ -252,6 +264,13 @@ export default function PolygameScreen() {
     setZoomLabel(m ? `${m.games[g].teams[0].name}  VS  ${m.games[g].teams[1].name}` : "");
     dispatch({ type: "openMatch", id });
     resetFlow(g);
+    // the zoom lands on the required shape (Polygame), not straight on the live screen
+    if (targetFor(m)) {
+      setLayer(shapeRef.current, 1, 1, 0);
+      shapeOpenRef.current = true;
+      setShapeOpen(true);
+      setShapeOn(false);
+    }
     const game = layerRefs.current[0];
     await tween(ZOOM_MS, (p) => {
       const q = easeInOut(p);
@@ -265,6 +284,19 @@ export default function PolygameScreen() {
     if (game) game.style.transform = "";
     await tween(260, (p) => placeZoom(FULL, 1 - p));
     hideZoom();
+    if (shapeOpenRef.current) setShapeOn(true);
+    busy.current = false;
+  };
+
+  /** Required shape → the live match: the reveal clears away, then dissolves. */
+  const closeShape = async () => {
+    if (busy.current || !shapeOpenRef.current) return;
+    busy.current = true;
+    setShapeOn(false);
+    await wait(380);
+    await tween(420, (p) => setLayer(shapeRef.current, 1 - easeInOut(p), 1, 0));
+    closeShapeNow();
+    setLayer(shapeRef.current, 1, 1, 0);
     busy.current = false;
   };
 
@@ -279,6 +311,7 @@ export default function PolygameScreen() {
     // cover the current screen, then shrink back into the card
     await tween(200, (p) => placeZoom(FULL, p));
     resetFlow();
+    closeShapeNow();
     listOpenRef.current = true;
     setListOpen(true);
     setListOn(true);
@@ -472,6 +505,7 @@ export default function PolygameScreen() {
     homolOpenRef.current = false;
     setHomolOpen(false);
     setHomolOn(false);
+    closeShapeNow();
     busy.current = false;
   };
 
@@ -522,12 +556,15 @@ export default function PolygameScreen() {
           ? stateRef.current.mode === "cup"
             ? "bracket"
             : "matches"
-          : VIEWS[viewRef.current];
+          : shapeOpenRef.current
+            ? "shape"
+            : VIEWS[viewRef.current];
 
   /** The show's Next (lib/flow.ts decides what that is from here). */
   const doNext = () => {
     if (boardOpenRef.current) return;
     const v = viewNow();
+    if (v === "shape") return void closeShape();
     if (v === "game" || v === "stats" || v === "final" || v === "board") {
       if (busy.current) queued.current = "next";
       else void goNext();
@@ -549,6 +586,7 @@ export default function PolygameScreen() {
   const doPrev = () => {
     if (boardOpenRef.current) return;
     const v = viewNow();
+    if (v === "shape") return void backToList();
     if (v === "game" || v === "stats" || v === "final" || v === "board") {
       if (busy.current) queued.current = "prev";
       else void goPrev();
@@ -733,7 +771,9 @@ export default function PolygameScreen() {
         ? state.mode === "cup"
           ? "bracket"
           : "matches"
-        : VIEWS[viewIdx];
+        : shapeOpen
+          ? "shape"
+          : VIEWS[viewIdx];
   const screen: Screen = { view: screenView, overlay: boardOpen, homol: homolStep };
   const [pulse, setPulse] = useState(0);
   const [toast, setToast] = useState<{ key: number; text: string } | null>(null);
@@ -805,6 +845,10 @@ export default function PolygameScreen() {
   }, []);
 
   const cupRound = state.current ? state.matches.find((m) => m.id === state.current)?.cup : undefined;
+  // the open Polygame match's required shape (its outline stays on the teams' grids)
+  const target = currentTarget(state);
+  const openNum = state.matches.find((m) => m.id === state.current)?.num ?? 0;
+  const shapeLabel = `${cupRound ? CUP_LABEL[cupRound] : `Match ${String(openNum).padStart(2, "0")}`} · Polygame`;
 
   // the cup's champion, for the ceremony
   const fin = cupMatch(state, "final");
@@ -883,6 +927,7 @@ export default function PolygameScreen() {
               id={0}
               team={state.teams[0]}
               opponent={state.teams[1]}
+              target={target}
               dispatch={dispatch}
               active={!listOpen && view === "game"}
               variant={state.game === "garden" ? "garden" : state.game === "game3" ? "mine" : "polygame"}
@@ -900,6 +945,7 @@ export default function PolygameScreen() {
               id={1}
               team={state.teams[1]}
               opponent={state.teams[0]}
+              target={target}
               dispatch={dispatch}
               active={!listOpen && view === "game"}
               variant={state.game === "garden" ? "garden" : state.game === "game3" ? "mine" : "polygame"}
@@ -909,6 +955,16 @@ export default function PolygameScreen() {
         </div>
         {/* a card or green triangle about to take effect: its countdown, big */}
         <EffectCountdown state={state} />
+        </div>
+
+        {/* A Polygame match's required shape, big (opaque, over the live screen while open) */}
+        <div
+          ref={shapeRef}
+          inert={!shapeOpen}
+          className={`absolute inset-0 z-[34] bg-[var(--bg)] ${shapeOpen ? "" : "pointer-events-none invisible"}`}
+        >
+          <Backdrop />
+          {shapeOpen && target && <ShapeReveal on={shapeOn} target={target} label={shapeLabel} />}
         </div>
 
         {/* Screen 0: match list (opaque, on top while open) */}
