@@ -1,85 +1,293 @@
-# TRSYP 3.0 — live screens
+<div align="center">
 
-Two pages:
+<img src="docs/readme/banner.webp" alt="TRSYP 3.0 Live Show" width="100%">
 
-- **`/` — the main screen**, shown on the event's big screen. A fixed 1920×1080 stage that scales to the window. It shows only what the audience should see: no buttons, hints or forms. It holds the whole game and saves it in its browser, so a refresh keeps everything.
-- **`/control` — the remote**, on a phone or a PC. Every command and every form lives here. Scores are typed privately and reach the screen only when you show them.
+<h3>The scoreboard of the TRSYP 3.0 robotics competition</h3>
 
-## Connecting
+<p>
+  A live show on the venue's big screen, driven from a phone in the crowd.
+</p>
 
-The two talk over a Supabase Realtime channel (nothing is stored on Supabase). The channel name comes from a secret key you choose:
+<p>
+  <img alt="Next.js" src="https://img.shields.io/badge/Next.js-16-000000?style=for-the-badge&logo=nextdotjs&logoColor=white">
+  <img alt="React" src="https://img.shields.io/badge/React-19-149ECA?style=for-the-badge&logo=react&logoColor=white">
+  <img alt="Supabase Realtime" src="https://img.shields.io/badge/Supabase-Realtime-3FCF8E?style=for-the-badge&logo=supabase&logoColor=white">
+  <img alt="Tailwind CSS" src="https://img.shields.io/badge/Tailwind-4-38BDF8?style=for-the-badge&logo=tailwindcss&logoColor=white">
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5-3178C6?style=for-the-badge&logo=typescript&logoColor=white">
+</p>
 
-1. On the screen PC open `http://localhost:3000/?key=YOUR-KEY` once. The key is remembered.
-2. On the phone (same network) open `http://<PC's IP>:3000/control`, type the same key and press Connect. The header turns to **Screen live**.
+<p>
+  <a href="#-00--homologation"><b>Homologation</b></a> ·
+  <a href="#-the-league"><b>League</b></a> ·
+  <a href="#-the-champions-cup"><b>Cup</b></a> ·
+  <a href="#-how-it-works"><b>How it works</b></a> ·
+  <a href="#-running-the-show"><b>Run it</b></a>
+</p>
 
-`.env.local` needs `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` (the public anon key only).
+</div>
 
-## The show
 
-The order is fixed. On the remote, **Next** always does the next thing and says what it is ("Start 00 · Homologation", "Show Phase Stats", ...). **Back** steps back. The Program panel can jump to a stage, but only use it to fix a mistake.
+## 🎬 The idea
 
-1. **Logo**: the TRSYP logo, big.
-2. **00 · Homologation**: done once, before any game.
-   Each robot is checked against the technical specs and gets **0–50 points**.
-   - Type the six scores on the remote. You can do this in advance while the logo is up.
-   - Next plays the opener, then **shows the scores**: they count up with a bar per team.
-   - The points go into the league table at that moment. Next then shows the **leaderboard** with a `+N` badge per team.
-   - To correct a score later, change it and press **Update on screen**. Only the difference is applied.
-3. **01 · Polygame**: title card → line-up of the 3 league matches.
-   - The pairs: LONE WOLVES v WAHCHY, HANNIBAL v SPARK, NEXORA v HEPTABOT. AUTOBOTS and SYNAPTECH are out.
-   - Each match is played with its 3 phases in one go: live screen → Phase Stats → Game Stats → leaderboard → back to the line-up.
-   - Each Polygame match opens on its **required shape**, big: a 5×5 grid with the shape lit up, its letter, and what it's built from. Next starts the match, and the shape's outline stays on both teams' grids (and the remote's).
-   - The shapes: match 1 **T** (3 cubes · 4 triangles), match 2 **R**, match 3 **S**, 3rd place **Y**, final **P** (3 cubes · 2 triangles each). They live in `lib/shapes.ts`.
-4. **02 · Garden**: same pairs, same flow. Its Game Stats details screen shows time, position and the final score.
-5. **03 · Champions Cup**: the league's top 4, always **1st v 4th** and **2nd v 3rd**.
-   - The pairs follow the table until the first cup match is opened.
-   - Semi-finals are played in **Mine**. Then come the **3rd place match** and the **final**, both in **Polygame**.
-   - Cup scores never touch the league table. After the final, Next crowns the champion, then returns to the logo.
+Robots played head to head in front of the audience. Someone had to start the timers, follow every piece the robots
+placed, apply the penalties and put the scores on the big screen, while walking around the arena. So the app is two
+pages on two devices:
 
-**Table** on the remote shows the full leaderboard over any screen. It never adds points.
+- **`/`, the big screen.** A 1920×1080 stage on the projector. It shows only the show: no buttons, no forms.
+- **`/control`, the remote.** A phone. Every command and every score is entered here, privately, and reaches the
+  screen only when the operator presses **Next** or **Show**.
 
-## During a match (remote)
+The camera areas on the screen are left empty on purpose: OBS lays the robots' live video over them.
 
-- **Phases**: one Start / End button for both teams. Ending a phase records each team's time from its timer. Undo and Restart are also on the remote. Each team can also stop its own timer ("Finished") or resume it.
-- **Polygame boards**: drag a piece from a team's shapes onto its 5×5 grid (works with touch).
-  - Dropping a triangle asks for one of its 4 orientations.
-  - A used piece turns grey and stays used for all 3 phases.
-  - Green triangles never go on the grid. Tap one to freeze the opponent's robot for 20 s, after a 5 s countdown shown big on the screen.
-    - The triangle greys out for the rest of the match.
-    - On the screen, frost sweeps the frozen team's boards and its timer panel ices over with a 20 s countdown.
-    - Tap a played green to give it back.
-- **Pin**: choose 4 unused pieces of the pinned team and validate. The screen plays a freeze animation.
-  - Frozen pieces cannot be used. They stay frozen after unpinning and through all 3 phases.
-- **Stats**: filled privately per phase, then **Show** puts them on the screen.
-  - Times come from the timers and can be edited. A phone can type `4.12`, `412` or `5` for 4:12 / 4:12 / 5:00.
-  - Editing stats that are already on screen shows an "updated" toast.
-- **Garden**: chances left per team. Starting chances apply to every Garden match not played yet.
-- **Mine**: the screen shows each team's three glitch cards above its timer, and no score (the score comes with Game Stats).
-  - The cards are Signal Jam (5 s), Blind Pilot (15 s) and One Hand Control (15 s).
-  - Tap a card on the remote to play it. It can be played once per match.
-  - On the screen a 5 s countdown runs big across the bottom half first. Then the card glitches in and counts down, and the opponent's timer shows the card's name and the seconds left.
-  - When the effect ends, the card greys out as Used. Played by mistake? Tap it twice on the remote to undo.
+<p><img src="docs/readme/setup.webp" alt="The big screen showing a live Polygame match, and the phone remote linked to it" width="100%"></p>
 
-The camera areas are left empty on purpose: OBS lays the live streams over them.
+<br>
 
-## Scoring (from "Scoring system.pdf")
+Here is the night, in the order we played it.
 
-| Game | Position, on time | Position, late | Other |
-| --- | --- | --- | --- |
-| Polygame, per phase (limit 5:00) | 1st 30 · 2nd 10 | 1st 20 · 2nd 0 | accuracy up to 20 |
-| Garden (limit 3:00) | 1st 30 · 2nd 15 | 1st 15 · 2nd 0 | attempt 1st +20 · 2nd +10 · 3rd 0; wrong scanning order −20 each |
-| Mine (limit 3:00) | 1st 30 · 2nd 20 | 1st 20 · 2nd 0 | edge −1 · cube drop −2 · mine −3 each; unsafe line −30 |
+## 🔧 00 · Homologation
 
-Homologation adds 0–50 to each team's league points before the first game. Game Stats shows the score of the game just played. The dominant team appears in its own corner colour.
+Before any game, each robot was checked against the technical specs and given **0 to 50 points**. The scores were
+typed on the phone while the logo was still up, then revealed together. They count up on screen and go straight into
+the league table.
 
-## Keyboard on the screen PC (backup)
+<p><img src="docs/readme/homologation.webp" alt="Homologation scores typed on the phone, then shown on the big screen" width="100%"></p>
 
-`→` / `←` next / back · `Home` logo · `Tab` leaderboard (Tab / Esc closes) · `Z` from a match back to the line-up.
+<br>
 
-## Run
+## 🏁 The league
+
+The teams met in three pairs. Each pair played **Polygame**, then **Garden**, and every point went into one league
+table.
+
+### 01 · Polygame
+
+Two robots build the same shape on a 5×5 grid, using pieces from their board: red and blue **cubes** fill a square,
+red and blue **triangles** fill half of one. The match is played in **three phases**, each with its own rule on which
+pieces are allowed:
+
+| Phase | Name | Pieces allowed |
+|:---:|---|---|
+| 1 | **Shape** | Any piece |
+| 2 | **Parity** | Only pieces with a given parity |
+| 3 | **Colour** | Only pieces of a given colour |
+
+Every match opens on its **required shape**, shown big before the robots start.
+
+<p><img src="docs/readme/polygame-shape.webp" alt="The required shape of the first match: the letter T" width="100%"></p>
+
+<br>
+
+Then, during the match, every piece a robot places is dragged on the phone from the team's board onto its grid. It
+greys out on the board and lights up on the big screen, inside the outline of the required shape.
+
+<p><img src="docs/readme/polygame-live.webp" alt="A piece dragged on the phone lights up on the big screen" width="100%"></p>
+
+<br>
+
+Two moves to slow the other team down:
+
+- **Green triangles** never go on the grid. Played, they **freeze the opponent's robot for 20 s**, after a
+  5-second countdown on screen.
+- **Pin:** when a robot is pinned, four of its unused pieces freeze for the rest of the match.
+
+After each phase, the timers already know who finished first and in how long; the operator adds the jury's
+accuracy. **Show** then draws the Phase Stats on screen, followed by the match score and the updated league table.
+
+<p><img src="docs/readme/polygame-stats.webp" alt="Phase stats entered on the phone, then drawn on the big screen" width="100%"></p>
+
+<br>
+
+### 02 · Garden
+
+The same pairs, a new game. Each team has a limited number of **chances**, shown big on screen, and loses one at
+every failed attempt.
+
+<p><img src="docs/readme/garden-live.webp" alt="Garden live screen with the chances left for each team" width="100%"></p>
+
+<br>
+
+At the end, the phone sets the position, which attempt worked, and the scans made out of order. The details come up
+on screen, then the updated league table.
+
+<p><img src="docs/readme/garden-stats.webp" alt="Garden stats entered on the phone, then shown on the big screen" width="100%"></p>
+
+<br>
+
+## 🏆 The Champions Cup
+
+After the league, the top four went to the cup, always **1st against 4th** and **2nd against 3rd**.
+
+<p><img src="docs/readme/cup-bracket.webp" alt="The Champions Cup bracket before the semi-finals" width="100%"></p>
+
+<br>
+
+### Semi-finals · Mine
+
+Robots carry a cube across the field without touching the edges or the mines. Each team holds three **glitch cards**
+to sabotage the other, each playable once per match:
+
+| Card | Effect on the opponent |
+|---|:---:|
+| 📡 **Signal Jam** | 5 s |
+| 🥽 **Blind Pilot** | 15 s |
+| 🎮 **One Hand Control** | 15 s |
+
+One tap on the phone, a five-second countdown on the big screen, then the glitch hits and the opponent's timer shows
+how long it lasts.
+
+<p><img src="docs/readme/mine.webp" alt="A glitch card tapped on the phone triggers a countdown on the big screen" width="100%"></p>
+
+<br>
+
+### 3rd place and final · back to Polygame
+
+The two last matches of the night went back to Polygame, with the same three phases and two new shapes: **Y** for
+the 3rd place match and **P** for the final.
+
+And with that, we had played Polygame five times: three league matches, the 3rd place match and the final. Put the
+five required shapes side by side…
+
+<p><img src="docs/readme/trsyp.webp" alt="The five required shapes: T, R, S, Y and P" width="100%"></p>
+
+<br>
+
+<div align="center">
+  <h3>…we finally did TRSYP, with shapes.</h3>
+</div>
+
+<br>
+
+<p><img src="docs/readme/cup-final.webp" alt="The Champions Cup bracket after the final" width="100%"></p>
+
+<br>
+
+<p><img src="docs/readme/champion.webp" alt="The champion ceremony" width="100%"></p>
+
+<br>
+
+## 🧮 Scoring
+
+From the competition's scoring system, computed live in [`lib/scoring.ts`](lib/scoring.ts):
+
+| Game | Finishing 1st / 2nd, on time | Finishing 1st / 2nd, late | Everything else |
+|---|:---:|:---:|---|
+| **Polygame**, per phase (limit 5:00) | 30 / 10 | 20 / 0 | accuracy, up to 20 |
+| **Garden** (limit 3:00) | 30 / 15 | 15 / 0 | success on the 1st try +20, 2nd +10, 3rd 0 · each scan out of order −20 |
+| **Mine** (limit 3:00) | 30 / 20 | 20 / 0 | edge contact −1 · cube drop −2 · mine contact −3 · crossing the unsafe line −30 |
+
+Homologation adds 0 to 50 league points before the first game. A time nobody recorded counts as on time.
+
+## 🔌 How it works
+
+There is no backend. The two pages talk over a **Supabase Realtime broadcast channel**, and nothing is stored on
+Supabase.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor O as Operator
+    participant P as Phone · /control
+    participant R as Supabase Realtime<br/>channel trsyp3-hash(key)
+    participant S as Big screen · /
+
+    S->>R: join with the key from ?key=…
+    O->>P: type the same key, Connect
+    P->>R: join, then send hello
+    R->>S: hello
+    S->>R: snapshot (state + view + clock)
+    R->>P: snapshot
+    P-->>O: ● Screen live
+    loop every 4 s
+        S->>R: snapshot (heartbeat)
+        R->>P: snapshot
+    end
+    O->>P: tap Next
+    P->>R: command next (from: the view it saw)
+    R->>S: command next
+    alt the screen still shows that view
+        S->>S: run the next step, save in the browser
+        S->>R: new snapshot
+        R->>P: new snapshot
+        P-->>O: shows what is on screen, and what Next does now
+    else the screen has already moved on
+        S->>S: ignore the stale tap
+    end
+```
+
+```mermaid
+flowchart LR
+    P["📱 Phone · /control<br/>buttons and private drafts"]
+    R(["Supabase Realtime<br/>broadcast only, nothing stored"])
+    S["🖥 Big screen · /<br/>game reducer + show order"]
+    L[("Browser storage<br/>survives a refresh")]
+
+    P -- "commands" --> R
+    R -- "commands" --> S
+    S -- "saves" --> L
+    S -. "snapshots" .-> R
+    R -. "snapshots" .-> P
+```
+
+## 🚀 Running the show
 
 ```bash
 pnpm install
-pnpm dev      # the phone needs the PC's port 3000 open on a private network
-pnpm build && pnpm start   # for the event
+pnpm build && pnpm start       # pnpm dev works too
 ```
+
+`.env.local` needs `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` (the public anon key only). In dev,
+the app accepts requests from every local IPv4 address of the PC, so a phone on the same Wi-Fi or hotspot can open
+the remote without any config.
+
+1. On the screen PC, open `http://localhost:3000/?key=YOUR-KEY` once, then go full screen. The key is remembered.
+2. On the phone, open `http://<PC's IP>:3000/control`, type the same key and press **Connect**.
+3. The phone's header turns to **● Screen live**. From there, it's Next all the way.
+
+<details>
+<summary><b>Keyboard backup on the screen PC</b></summary>
+
+| Keys | Action |
+|---|---|
+| <kbd>→</kbd> <kbd>←</kbd> | Next / back |
+| <kbd>Home</kbd> | Back to the logo |
+| <kbd>Tab</kbd>, <kbd>Esc</kbd> | Show / hide the leaderboard |
+| <kbd>Z</kbd> | From a match, back to the line-up |
+| <kbd>Space</kbd> | Start both timers |
+| <kbd>R</kbd> / <kbd>U</kbd> | Pin / unpin team 1 / team 2 (Polygame) |
+| <kbd>E</kbd> <kbd>D</kbd> · <kbd>I</kbd> <kbd>J</kbd> | Team 1 / team 2 uses or gets back a chance (Garden) |
+| <kbd>Shift</kbd> + <kbd>1</kbd>–<kbd>9</kbd> | Starting chances for every Garden match |
+| <kbd>Shift</kbd> + <kbd>X</kbd> twice | Reset both boards, timers and points |
+
+</details>
+
+<details>
+<summary><b>Project structure</b></summary>
+
+```text
+app/
+├── page.tsx                The big screen
+└── control/page.tsx        The remote
+components/
+├── PolygameScreen.tsx      The stage: every screen, transitions, keyboard, the link to the remote
+├── control/Controller.tsx  The whole remote
+└── …                       One component per screen (shape reveal, stats, leaderboard, bracket, champion)
+lib/
+├── game.ts                 Game state and its reducer: matches, boards, timers, league, cup
+├── flow.ts                 What Next does from any screen
+├── scoring.ts              The scoring system
+├── shapes.ts               The five required shapes
+└── remote.ts               The Realtime link: key, channel, commands and snapshots
+```
+
+</details>
+
+---
+
+Part of TRSYP 3.0, with the [main platform](https://github.com/IEEE-INSAT/TRSYP3.0) and its [admin portal](https://github.com/MakkiAloulou/TRSYP3.0-Admin-Portal).
+
+<br>
+
+<div align="center">
+  <sub>IEEE INSAT Student Branch × IEEE RAS Tunisia Section · TRSYP 3.0 · 2026</sub>
+</div>
